@@ -23,13 +23,13 @@ type DriveListResponse map[DriveId]Drive
 type NodeListResponse map[NodeId]Node
 
 type Activity struct {
-	NumOps                    int `json:"num_ops"`
-	NumReads                  int `json:"num_reads"`
-	NumWrites                 int `json:"num_writes"`
-	ObsDownloadBytesPerSecond int `json:"obs_download_bytes_per_second"`
-	ObsUploadBytesPerSecond   int `json:"obs_upload_bytes_per_second"`
-	SumBytesRead              int `json:"sum_bytes_read"`
-	SumBytesWritten           int `json:"sum_bytes_written"`
+	NumOps                    float32 `json:"num_ops"`
+	NumReads                  float32 `json:"num_reads"`
+	NumWrites                 float32 `json:"num_writes"`
+	ObsDownloadBytesPerSecond float32 `json:"obs_download_bytes_per_second"`
+	ObsUploadBytesPerSecond   float32 `json:"obs_upload_bytes_per_second"`
+	SumBytesRead              float32 `json:"sum_bytes_read"`
+	SumBytesWritten           float32 `json:"sum_bytes_written"`
 }
 
 type HostsCount struct {

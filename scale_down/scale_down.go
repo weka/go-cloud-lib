@@ -232,7 +232,7 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 		"no_wait": true,
 	}, nil)
 	if err != nil {
-		logger.Error().Err(err)
+		logger.Error().Err(err).Send()
 		p.AddTransientError(err, "removeInactive")
 	}
 	return
@@ -279,7 +279,7 @@ func removeDrive(ctx context.Context, jpool *jrpc.Pool, drive weka.Drive, p *pro
 		"drive_uuids": []uuid.UUID{drive.Uuid},
 	}, nil)
 	if err != nil {
-		logger.Error().Err(err)
+		logger.Error().Err(err).Send()
 		p.AddTransientError(err, "removeDrive")
 	}
 }
@@ -338,7 +338,7 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 		"skip_resource_validation": false,
 	}, nil)
 	if err1 != nil {
-		logger.Error().Err(err1)
+		logger.Error().Err(err1).Send()
 		response.AddTransientError(err1, "deactivateHost")
 	} else {
 		jpool.Drop(host.HostIp)
@@ -361,7 +361,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		NEW_D = max(A+U+D-T, min(2-D, U), 0)
 	*/
 	logger := logging.LoggerFromCtx(ctx)
-
+	logger.Info().Msg("Running scale down...")
 	response.Version = protocol.Version
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
@@ -385,25 +385,30 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 	err = jpool.Call(weka.JrpcStatus, struct{}{}, &systemStatus)
 	if err != nil {
+		logger.Error().Err(err).Send()
 		return
 	}
 	err = isAllowedToScale(systemStatus)
 	if err != nil {
+		logger.Error().Err(err).Send()
 		return
 	}
 	err = jpool.Call(weka.JrpcHostList, struct{}{}, &hostsApiList)
 	if err != nil {
+		logger.Error().Err(err).Send()
 		return
 	}
 
 	if info.Role == "backend" {
 		err = jpool.Call(weka.JrpcDrivesList, struct{}{}, &driveApiList)
 		if err != nil {
+			logger.Error().Err(err).Send()
 			return
 		}
 	}
 	err = jpool.Call(weka.JrpcNodeList, struct{}{}, &nodeApiList)
 	if err != nil {
+		logger.Error().Err(err).Send()
 		return
 	}
 

@@ -48,6 +48,34 @@ type Logger struct {
 	*zerolog.Logger
 }
 
+func (l *Logger) Printf(msg string, opts ...any) {
+	l.Info().CallerSkipFrame(1).Msgf(msg, opts...)
+}
+
+func (l *Logger) Errorf(msg string, opts ...any) {
+	l.Error().CallerSkipFrame(1).Msgf(msg, opts...)
+}
+
+func (l *Logger) Debugf(msg string, opts ...any) {
+	l.Debug().CallerSkipFrame(1).Msgf(msg, opts...)
+}
+
+func (l *Logger) Tracef(msg string, opts ...any) {
+	l.Trace().CallerSkipFrame(1).Msgf(msg, opts...)
+}
+
+func (l *Logger) PrintErr(err error) {
+	l.Info().CallerSkipFrame(1).Err(err).Send()
+}
+
+func (l *Logger) WarnErr(err error) {
+	l.Warn().CallerSkipFrame(1).Err(err).Send()
+}
+
+func (l *Logger) FatalErr(err error) {
+	l.Fatal().CallerSkipFrame(1).Err(err).Send()
+}
+
 func getLogLevel() zerolog.Level {
 	lvlStr := os.Getenv("LOG_LEVEL")
 	lvl := 1 // info level

@@ -128,6 +128,12 @@ func remoteDownHosts(hosts []hostInfo, jpool *jrpc.Pool) {
 
 }
 
+type machineState struct {
+	Healthy      int
+	Unhealthy    int
+	Deactivating int
+}
+
 func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) int {
 	/*
 		A - Fully active, healthy
@@ -146,19 +152,33 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 	nUnhealthy := 0
 	nDeactivating := 0
 
+	machines := make(map[string]*machineState)
 	for _, host := range hostInfo {
+		if _, ok := machines[host.HostIp]; !ok {
+			machines[host.HostIp] = &machineState{0, 0, 0}
+		}
 		switch host.scaleState {
 		case HEALTHY:
-			nHealthy++
+			machines[host.HostIp].Healthy++
 		case UNHEALTHY:
-			nUnhealthy++
+			machines[host.HostIp].Unhealthy++
 		case DEACTIVATING:
+			machines[host.HostIp].Deactivating++
+		}
+	}
+
+	for _, machine := range machines {
+		if machine.Unhealthy > 0 {
+			nUnhealthy++
+		} else if machine.Deactivating > 0 {
 			nDeactivating++
+		} else {
+			nHealthy++
 		}
 	}
 
 	toDeactivate := CalculateDeactivateTarget(nHealthy, nUnhealthy, nDeactivating, desired)
-	logger.Info().Msgf("%d hosts set to deactivate. nHealthy: %d nUnhealthy:%d nDeactivating: %d desired:%d", toDeactivate, nHealthy, nUnhealthy, nDeactivating, desired)
+	logger.Info().Msgf("%d machines set to deactivate. nHealthy: %d nUnhealthy:%d nDeactivating: %d desired:%d", toDeactivate, nHealthy, nUnhealthy, nDeactivating, desired)
 	return toDeactivate
 }
 
@@ -508,11 +528,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	driveContainers := getDriveContainers(hostsList)
 	machinesNumber := len(driveContainers)
 	logger.Info().Msgf("Machines number:%d, Desired number:%d", machinesNumber, info.DesiredCapacity)
-	numToDeactivate := 0
-	if machinesNumber > info.DesiredCapacity {
-		numToDeactivate = machinesNumber - info.DesiredCapacity
-		logger.Debug().Msgf("Number of machines to deactivate: %d", machinesNumber-info.DesiredCapacity)
-	}
+	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)
 
 	for _, host := range driveContainers[:numToDeactivate] {
 		deactivateHost(ctx, jpool, hostsApiList, &response, host)

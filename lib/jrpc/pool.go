@@ -2,10 +2,11 @@ package jrpc
 
 import (
 	"context"
+	"sync"
+
 	"github.com/rs/zerolog/log"
 	strings2 "github.com/weka/go-cloud-lib/lib/strings"
 	"github.com/weka/go-cloud-lib/lib/weka"
-	"sync"
 )
 
 type ClientBuilder func(ip string) *BaseClient
@@ -36,6 +37,10 @@ func (c *Pool) Drop(toDrop string) {
 }
 
 func (c *Pool) Call(method weka.JrpcMethod, params, result interface{}) (err error) {
+	if len(c.Ips) == 0 {
+		log.Debug().Msgf("Pool.Ips is empty")
+		return nil
+	}
 	if c.Active == "" {
 		c.Lock()
 		c.Active = c.Ips[0]

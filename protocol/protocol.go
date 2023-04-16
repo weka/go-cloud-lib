@@ -67,3 +67,13 @@ func (r *TerminatedInstancesResponse) AddTransientErrors(errs []error) {
 func (r *TerminatedInstancesResponse) AddTransientError(err error, caller string) {
 	r.TransientErrors = append(r.TransientErrors, fmt.Sprintf("%s:%s", caller, err.Error()))
 }
+
+type BackendCoreCount struct {
+	Total     int
+	Frontend  int
+	Drive     int
+	Converged bool
+	Memory    int
+}
+
+type BackendCoreCounts map[string]BackendCoreCount

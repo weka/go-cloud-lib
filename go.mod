@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/google/uuid v1.3.0
 	github.com/justinas/alice v1.2.0
+	github.com/lithammer/dedent v1.1.0
 	github.com/rs/zerolog v1.29.0
 	golang.org/x/oauth2 v0.6.0
 )

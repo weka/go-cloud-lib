@@ -73,7 +73,7 @@ type BackendCoreCount struct {
 	Frontend  int
 	Drive     int
 	Converged bool
-	Memory    int
+	Memory    string
 }
 
 type BackendCoreCounts map[string]BackendCoreCount

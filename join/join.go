@@ -3,9 +3,10 @@ package join
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/weka/go-cloud-lib/bash_functions"
 	"github.com/weka/go-cloud-lib/functions_def"
-	"strings"
 
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/common"
@@ -151,9 +152,9 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
-	cat >/opt/weka/tmp/find_drives.py <<EOL
-	%s
-	EOL
+
+	# write down find_drives script (another string input for this template)
+	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
 		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
@@ -176,5 +177,6 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	echo "completed successfully" > /tmp/weka_join_completion_validation
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Join completed successfully\"}"
 	`
-	return dedent.Dedent(fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript))
+	s = dedent.Dedent(s)
+	return fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript)
 }

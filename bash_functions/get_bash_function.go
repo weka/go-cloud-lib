@@ -6,7 +6,7 @@ import (
 
 func GetCoreIds() string {
 	s := `
-	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
+	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 |  cut -d "," -f 1 | sort -u | tr '\n' ' ')
 	core_ids="${core_ids[@]/0}"
 	IFS=', ' read -r -a core_ids <<< "$core_ids"
 	core_idx_begin=0
@@ -30,14 +30,17 @@ func GetNetStrForDpdk() string {
 		i=$1
 		j=$2
 		net=" "
-		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
+		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}' | sort -u)
 		for ((i; i<$j; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 			if [ -z $eth ];then
 				net=""
 				break
 			fi
-			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
+			if [ -z $enp ];then
+				enp=eth$i
+			fi
 			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
 			net="$net --net $enp/$eth/${netmask[1]}/$gateway"

@@ -30,7 +30,6 @@ func GetNetStrForDpdk() string {
 		i=$1
 		j=$2
 		net=" "
-		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}' | sort -u)
 		for ((i; i<$j; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 			if [ -z $eth ];then
@@ -43,6 +42,8 @@ func GetNetStrForDpdk() string {
 			fi
 			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
+			gateway=${eth%.*}
+			gateway+=".1"
 			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
 		done
 	}

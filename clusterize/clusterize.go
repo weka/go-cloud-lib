@@ -99,7 +99,10 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster update --cluster-name="$CLUSTER_NAME"
 
 	weka cloud enable
-	weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
+
+	if [ "$STRIPE_WIDTH" -gt 0 ] && [ "$PROTECTION_LEVEL" -gt 0 ]; then
+		weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
+	fi
 	weka cluster hot-spare $HOTSPARE
 	weka cluster start-io
 	

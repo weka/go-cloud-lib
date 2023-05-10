@@ -19,6 +19,7 @@ type JoinParams struct {
 	WekaPassword   string
 	InstallDpdk    bool
 	InstanceParams protocol.BackendCoreCount
+	Gateways       []string
 }
 
 type JoinScriptGenerator struct {
@@ -36,6 +37,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
+	gateways := strings.Join(j.Params.Gateways, " ")
 
 	ips := j.Params.IPs
 	common.ShuffleSlice(ips)
@@ -51,6 +53,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	DRIVES=%d
 	COMPUTE_MEMORY=%s
 	INSTALL_DPDK=%t
+	GATEWAYS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 
 	declare -a backend_ips=$IPS
@@ -102,13 +105,13 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	if [[ $INSTALL_DPDK == true ]]; then
 		mgmt_ip=$(hostname -I | awk '{print $1}')
 
-		getNetStrForDpdk 1 $(($DRIVES+1))
+		getNetStrForDpdk 1 $(($DRIVES+1)) "$GATEWAYS"
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids $net --management-ips $mgmt_ip --dedicate
 
-		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
+		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE)) "$GATEWAYS"
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids $net --management-ips $mgmt_ip --dedicate
 
-		getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1))
+		getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1)) "$GATEWAYS"
 		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids $net --management-ips $mgmt_ip --dedicate
 	else
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
@@ -129,7 +132,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
 		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
-		compute, frontend, drive, mem, j.Params.InstallDpdk, reportFunc, joinFinalizationFunc,
+		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, reportFunc, joinFinalizationFunc,
 		getCoreIdsFunc, getNetStrForDpdkFunc,
 	)
 	return dedent.Dedent(bashScript)

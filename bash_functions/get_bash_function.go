@@ -56,7 +56,7 @@ func GetNetStrForDpdk() string {
 			fi
 			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
 			if [ -z $enp ];then
-				enp=$eth
+				enp=$(ethtool -i $eth | grep bus-info | awk '{print $2}') #pci for gcp
 			fi
 			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"

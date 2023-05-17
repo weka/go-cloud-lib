@@ -92,7 +92,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	
 	for drive_num in "${DRIVE_NUMS[@]}"; do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
-			weka cluster drive add $drive_num "/dev/nvme$d"n1
+			if [ lsblk "/dev/nvme$d"n1 >/dev/null 2>&1 ];then
+				weka cluster drive add $drive_num "/dev/nvme$d"n1 # azure
+			else
+				weka cluster drive add $drive_num "/dev/nvme0n$((d+1))" #gcp
+			fi
 		done
 	done
 

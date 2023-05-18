@@ -59,8 +59,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	SUBNETS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 
-	declare -a backend_ips=$IPS
-
 	# report function definition
 	%s
 
@@ -77,7 +75,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	random=$$
 	echo $random
-	for backend_ip in ${backend_ips[@]}; do
+	for backend_ip in ${IPS[@]}; do
 		if VERSION=$(curl -s -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' $backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
 			if [[ "$VERSION" != "" ]]; then
 				break

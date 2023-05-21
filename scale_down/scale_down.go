@@ -258,17 +258,37 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 	return
 }
 
-func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
+func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, inactiveHosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse, allHostsMap hostsMap) {
 	logger := logging.LoggerFromCtx(ctx)
-	for _, host := range hosts {
+	for _, host := range inactiveHosts {
 		deactivateHost(ctx, jpool, hostsApiList, p, host)
 		logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
 		jpool.Drop(host.HostIp)
 		containers := getMachineContainers(hostsApiList, host)
-		err1 := removeContainer(ctx, jpool, containers.Drive.Int(), p)
-		err2 := removeContainer(ctx, jpool, containers.Compute.Int(), p)
-		err3 := removeContainer(ctx, jpool, containers.Frontend.Int(), p)
-		if err1 != nil || err2 != nil || err3 != nil {
+
+		containrs := []weka.HostId{
+			containers.Drive,
+			containers.Compute,
+			containers.Frontend,
+		}
+
+		removeFailure := false
+		readyForRemove := true
+		for _, hostId := range containrs {
+			if hostId.String() != "" {
+				container := allHostsMap[hostId]
+				if container.Status == "INACTIVE" {
+					err := removeContainer(ctx, jpool, hostId.Int(), p)
+					if err != nil {
+						removeFailure = true
+					}
+				} else {
+					readyForRemove = false
+				}
+			}
+		}
+
+		if removeFailure || !readyForRemove {
 			continue
 		}
 
@@ -349,12 +369,19 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 		containers.Compute,
 		containers.Frontend,
 	)
+
+	var hostIds []weka.HostId
+	if containers.Drive.String() != "" {
+		hostIds = append(hostIds, containers.Drive)
+	}
+	if containers.Compute.String() != "" {
+		hostIds = append(hostIds, containers.Compute)
+	}
+	if containers.Frontend.String() != "" {
+		hostIds = append(hostIds, containers.Frontend)
+	}
 	err1 := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
-		"host_ids": []weka.HostId{
-			containers.Drive,
-			containers.Compute,
-			containers.Frontend,
-		},
+		"host_ids":                 hostIds,
 		"skip_resource_validation": false,
 	}, nil)
 	if err1 != nil {
@@ -365,6 +392,8 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 	}
 
 }
+
+type hostsMap map[weka.HostId]hostInfo
 
 func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
 	/*
@@ -432,7 +461,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return
 	}
 
-	hosts := map[weka.HostId]hostInfo{}
+	hosts := make(hostsMap)
 	for hostId, host := range hostsApiList {
 		hosts[hostId] = hostInfo{
 			Host:   host,
@@ -522,7 +551,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return a.AddedTime.Before(b.AddedTime)
 	})
 
-	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response)
+	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response, hosts)
 	removeOldDrives(ctx, driveApiList, jpool, &response)
 
 	driveContainers := getDriveContainers(hostsList)

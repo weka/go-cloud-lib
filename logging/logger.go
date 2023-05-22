@@ -10,6 +10,7 @@ import (
 
 func init() {
 	setCallerDirDisplayLevel()
+	zerolog.DefaultContextLogger = NewLogger().Logger
 }
 
 // Set the amount of nested dirs displayed before `<file_name>:<line_number>` for `caller` field in logger.

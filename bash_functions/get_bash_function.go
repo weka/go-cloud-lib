@@ -12,7 +12,7 @@ func GetCoreIds() string {
 	core_idx_begin=0
 	get_core_ids() {
 		core_idx_end=$(($core_idx_begin + $1))
-		res=${core_ids[i]}
+		res=${core_ids["$core_idx_begin"]}
 		for (( i=$(($core_idx_begin + 1)); i<$core_idx_end; i++ ))
 		do
 			res=$res,${core_ids[i]}

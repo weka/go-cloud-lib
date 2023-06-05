@@ -393,6 +393,15 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 
 }
 
+func isMBC(hostsApiList weka.HostListResponse) bool {
+	for _, host := range hostsApiList {
+		if strings2.Contains(host.ContainerName, "drive") {
+			return true
+		}
+	}
+	return false
+}
+
 type hostsMap map[weka.HostId]hostInfo
 
 func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
@@ -444,6 +453,12 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	}
 	err = jpool.Call(weka.JrpcHostList, struct{}{}, &hostsApiList)
 	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	if !isMBC(hostsApiList) {
+		err = fmt.Errorf("this wekactl version supports only multi backend constainer cluster")
 		logger.Error().Err(err).Send()
 		return
 	}

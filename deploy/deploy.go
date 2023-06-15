@@ -97,10 +97,10 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 		echo "Running containers: $ready_containers"
 	done
 
-	protect "{\"vm\": \"$VM\"}"
 	clusterize "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 	chmod +x /tmp/clusterize.sh
 	/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
+	protect "{\"vm\": \"$VM\"}"
 	`
 	script := fmt.Sprintf(
 		template, d.Params.VMName, d.FailureDomainCmd, d.Params.ComputeMemory, d.Params.ComputeContainerNum,

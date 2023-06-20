@@ -69,11 +69,11 @@ func (r *TerminatedInstancesResponse) AddTransientError(err error, caller string
 }
 
 type BackendCoreCount struct {
-	Total     int
-	Frontend  int
-	Drive     int
-	Converged bool
-	Memory    string
+	Compute       int
+	Frontend      int
+	Drive         int
+	Converged     bool
+	ComputeMemory string
 }
 
 type BackendCoreCounts map[string]BackendCoreCount

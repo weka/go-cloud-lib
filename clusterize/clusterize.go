@@ -28,6 +28,7 @@ type ClusterParams struct {
 	DataProtection    DataProtectionParams
 	InstallDpdk       bool
 	DebugOverrideCmds string
+	AddFrontend       bool
 }
 
 type ClusterizeScriptGenerator struct {
@@ -55,15 +56,21 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	WEKA_USERNAME="%s"
 	WEKA_PASSWORD="%s"
 	INSTALL_DPDK=%t
+	ADD_FRONTEND=%t
 
-	CONTAINER_NAMES=(drives0 compute0 frontend0)
-	PORTS=(14000 15000 16000)
+	CONTAINER_NAMES=(drives0 compute0)
+	PORTS=(14000 15000)
 
 	# report function definition
 	%s
 
 	# clusterize_finalization function definition
 	%s
+	if [[ $ADD_FRONTEND == true ]]; then
+		CONTAINER_NAMES+=(frontend0)
+		PORTS+=(16000)
+	fi
+
 
 	HOST_IPS=()
 	HOST_NAMES=()
@@ -147,7 +154,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,
 		params.SetObs, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
-		params.WekaUsername, params.WekaPassword, params.InstallDpdk, reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
+		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
 	)
 	return script
 }

@@ -345,6 +345,19 @@ func getMachineContainers(hostsApiList weka.HostListResponse, inputHost hostInfo
 	return
 }
 
+func isMachineInactive(hostsApiList weka.HostListResponse, containers machineContainers) bool {
+	if containers.Drive.String() != "" && hostsApiList[containers.Drive].State != "INACTIVE" {
+		return false
+	}
+	if containers.Compute.String() != "" && hostsApiList[containers.Compute].State != "INACTIVE" {
+		return false
+	}
+	if containers.Frontend.String() != "" && hostsApiList[containers.Frontend].State != "INACTIVE" {
+		return false
+	}
+	return true
+}
+
 func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.HostListResponse, response *protocol.ScaleResponse, host hostInfo) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Trying to deactivate machine %s...", host.HostIp)
@@ -509,14 +522,20 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 		switch host.State {
 		case "INACTIVE":
+			containers := getMachineContainers(hostsApiList, host)
 			if host.belongsToHgIpBased(info.Instances) {
-				inactiveHosts = append(inactiveHosts, hosts[getMachineContainers(hostsApiList, host).Drive])
-				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
+				if isMachineInactive(hostsApiList, containers) {
+					logger.Info().Msgf("Inactive machine found: %s", host.HostIp)
+					inactiveHosts = append(inactiveHosts, hosts[containers.Drive])
+					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
+				} else {
+					hostsList = append(hostsList, host)
+				}
 				continue
 			} else {
 				if info.Role == "backend" {
 					logger.Info().Msgf("host %s is inactive and does not belong to HG, removing from cluster", host.id)
-					inactiveHosts = append(inactiveHosts, hosts[getMachineContainers(hostsApiList, host).Drive])
+					inactiveHosts = append(inactiveHosts, hosts[containers.Drive])
 					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 					continue
 				}

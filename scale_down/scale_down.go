@@ -594,6 +594,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		logger.Error().Err(err).Send()
 		return
 	}
+	logger.Info().Msgf("Hosts list: %#v", hostsApiList)
 
 	if !isMBC(hostsApiList) {
 		err = fmt.Errorf("this wekactl version supports only multi backend constainer cluster")

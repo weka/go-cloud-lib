@@ -348,6 +348,10 @@ func (h logHandler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction 
 }
 
 func (h logHandler) Response(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireResponse) context.Context {
-	h.log.Printf("<--(%s: %v)-- %v", h.ep.String(), r.ID, r.Error)
+	var result json.RawMessage
+	if r.Result != nil {
+		result = *r.Result
+	}
+	h.log.Printf("<--(%s: %v)-- %v %s", h.ep.String(), r.ID, r.Error, result)
 	return ctx
 }

@@ -19,6 +19,7 @@ type ClusterParams struct {
 	VMNames           []string
 	IPs               []string
 	ClusterName       string
+	Prefix            string
 	HostsNum          int
 	NvmesNum          int
 	WekaUsername      string

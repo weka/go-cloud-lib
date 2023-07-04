@@ -134,11 +134,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
 	weka fs group create default
 	weka fs create default default "$full_capacity"B
-	
-	if [[ $SET_OBS == true ]]; then
-	  # 'set obs' script
-	  %s
-	fi
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		weka alerts mute NodeRDMANotActive 365d
@@ -151,6 +146,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Clusterization completed successfully\"}"
 
 	clusterize_finalization "{}"
+
+	if [[ $SET_OBS == true ]]; then
+		# 'set obs' script
+		%s || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}"
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"OBS setup completed successfully\"}"
+	fi
 	`
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,

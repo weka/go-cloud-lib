@@ -22,6 +22,12 @@ type ClusterStatus struct {
 	WekaStatus  WekaStatus `json:"weka_status"`
 }
 
+type Report struct {
+	Type     string `json:"type"`
+	Message  string `json:"message"`
+	Hostname string `json:"hostname"`
+}
+
 type Reports struct {
 	ReadyForClusterization []string            `json:"ready_for_clusterization"`
 	Progress               map[string][]string `json:"progress"`

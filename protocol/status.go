@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+// ClusterState is maintained in object store
+type ClusterState struct {
+	InitialSize int                 `json:"initial_size"`
+	DesiredSize int                 `json:"desired_size"`
+	Progress    map[string][]string `json:"progress"`
+	Errors      map[string][]string `json:"errors"`
+	Instances   []string            `json:"instances"`
+	Clusterized bool                `json:"clusterized"`
+}
+
 type ClusterStatus struct {
 	InitialSize int        `json:"initial_size"`
 	DesiredSize int        `json:"desired_size"`

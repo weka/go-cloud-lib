@@ -152,7 +152,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 			# 'set obs' script
 			%s
 		}
-		set_obs || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}" && exit 1
+		set_obs || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}" && exit 1)
 	fi
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"OBS setup completed successfully\"}"
 	`

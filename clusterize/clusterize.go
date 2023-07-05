@@ -148,10 +148,13 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	clusterize_finalization "{}"
 
 	if [[ $SET_OBS == true ]]; then
-		# 'set obs' script
-		%s || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}"
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"OBS setup completed successfully\"}"
+		function set_obs() {
+			# 'set obs' script
+			%s
+		}
+		set_obs || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}" && exit 1
 	fi
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"OBS setup completed successfully\"}"
 	`
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,

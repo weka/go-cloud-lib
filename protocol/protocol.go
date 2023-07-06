@@ -77,3 +77,13 @@ type BackendCoreCount struct {
 }
 
 type BackendCoreCounts map[string]BackendCoreCount
+
+type ObsParams struct {
+	Name              string
+	TieringSsdPercent string
+}
+
+type ClusterCreds struct {
+	Username string
+	Password string
+}

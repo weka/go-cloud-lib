@@ -30,6 +30,7 @@ type ClusterParams struct {
 	InstallDpdk       bool
 	DebugOverrideCmds string
 	AddFrontend       bool
+	FindDrivesScript  string
 }
 
 type ClusterizeScriptGenerator struct {
@@ -58,6 +59,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	WEKA_PASSWORD="%s"
 	INSTALL_DPDK=%t
 	ADD_FRONTEND=%t
+
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	mkdir -p /opt/weka/tmp
+	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
+	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
+	devices=($devices)
 
 	CONTAINER_NAMES=(drives0 compute0)
 	PORTS=(14000 15000)
@@ -97,16 +104,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	sleep 30s
 
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
-	
+
 	for drive_num in "${DRIVE_NUMS[@]}"; do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
 			while true; do
-				if lsblk "/dev/nvme$d"n1 >/dev/null 2>&1 ;then
-					weka cluster drive add $drive_num "/dev/nvme$d"n1 # azure
-					break
-				fi
-				if lsblk "/dev/nvme0n$((d+1))" >/dev/null 2>&1 ;then
-					weka cluster drive add $drive_num "/dev/nvme0n$((d+1))" #gcp
+				if lsblk "${devices[$d]}" >/dev/null 2>&1 ;then
+					weka cluster drive add $drive_num "${devices[$d]}"
 					break
 				fi
 				echo "waiting for nvme to be ready"
@@ -159,7 +162,8 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,
 		params.SetObs, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
-		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
+		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.FindDrivesScript,
+		reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
 	)
 	return script
 }

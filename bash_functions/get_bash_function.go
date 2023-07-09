@@ -58,18 +58,15 @@ func GetNetStrForDpdk() string {
 		i=$1
 		j=$2
 		gateways=$3
+		gateways=($gateways) #azure and gcp
 
-		if [ -n "$gateways" ]; then #azure and gcp
-			gateways=($gateways)
-		fi
-
-		net=" "
+		net=""
 		for ((i; i<$j; i++)); do
 			eth=eth$i
 			subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
-			if [ -z $subnet_inet ];then
-				net=""
-				break
+			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
+				net="$net --net $eth" #aws
+				continue
 			fi
 			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
 			if [ -z $enp ];then
@@ -78,12 +75,8 @@ func GetNetStrForDpdk() string {
 			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
 			
-			if [ -n "$gateways" ]; then
-				gateway=${gateways[$i]}
-				net="$net --net $enp/$subnet_inet/${netmask[1]}/$gateway"
-			else
-				net="$net --net $eth" #aws
-			fi
+			gateway=${gateways[$i]}
+			net="$net --net $enp/$subnet_inet/${netmask[1]}/$gateway"
 		done
 	}
 	`

@@ -31,6 +31,7 @@ type ClusterParams struct {
 	DebugOverrideCmds string
 	AddFrontend       bool
 	FindDrivesScript  string
+	ProxyUrl          string
 }
 
 type ClusterizeScriptGenerator struct {
@@ -59,6 +60,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	WEKA_PASSWORD="%s"
 	INSTALL_DPDK=%t
 	ADD_FRONTEND=%t
+	PROXY_URL="%s"
 
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	mkdir -p /opt/weka/tmp
@@ -120,6 +122,9 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
 
+	if [ -n "$PROXY_URL" ]; then
+		weka cloud proxy --set "$PROXY_URL"
+	fi
 	weka cloud enable || true # skipping required for private network
 
 	if [ "$STRIPE_WIDTH" -gt 0 ] && [ "$PROTECTION_LEVEL" -gt 0 ]; then
@@ -162,7 +167,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,
 		params.SetObs, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
-		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.FindDrivesScript,
+		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.ProxyUrl, params.FindDrivesScript,
 		reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
 	)
 	return script

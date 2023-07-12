@@ -161,7 +161,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 					sleep $retry_sleep
 			done
 			[ $count -eq 0 ] && {
-					echo "Retry failed [$retry_max]: $@"
+					echo "Retry failed [$retry_max]"
 					return 1
 			}
 			return 0

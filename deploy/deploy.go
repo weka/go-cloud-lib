@@ -124,8 +124,8 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	installScriptTemplate := `
 	# report function definition
 	%s
-	TOKEN=%s
-	INSTALL_URL=%s
+	TOKEN="%s"
+	INSTALL_URL="%s"
 	`
 	installScript := fmt.Sprintf(installScriptTemplate, reportFuncDef, d.Params.WekaToken, installUrl)
 

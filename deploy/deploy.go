@@ -137,7 +137,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		TAR_NAME=%s
 		PACKAGE_NAME=%s
 
-		gsutil cp $INSTALL_URL /tmp || wget -P /tmp $INSTALL_URL
+		gsutil cp "$INSTALL_URL" /tmp || wget -P /tmp "$INSTALL_URL"
 		cd /tmp
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME
@@ -168,7 +168,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		}
 
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-		retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
+		retry 300 2 curl --fail --max-time 10 "$INSTALL_URL" | sh
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 		`
 	}

@@ -74,7 +74,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	# wekio partition setup
 	%s
 
-	report -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
 
 	random=$$
 	echo $random
@@ -92,9 +92,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	done
 
-	report -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl $backend_ip:14000/dist/v1/install | sh
-	report -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
 	weka version prepare $VERSION

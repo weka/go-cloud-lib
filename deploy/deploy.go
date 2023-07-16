@@ -62,19 +62,10 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 	# getNetStrForDpdk bash function definition
 	%s
 
-	#deviceNameCmd
+	# deviceNameCmd
 	wekaiosw_device="%s"
-	if [ ! -z "wekaiosw_device" ]; then
-		echo "--------------------------------------------"
-		echo " Creating local filesystem on WekaIO volume "
-		echo "--------------------------------------------"
-		
-		sleep 4
-		mkfs.ext4 -L wekaiosw "$wekaiosw_device" || return 1
-		mkdir -p /opt/weka || return 1
-		mount "$wekaiosw_device" /opt/weka || return 1
-		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
-	fi
+	# wekio partition setup
+	%s
 
 	# install script
 	%s
@@ -127,7 +118,8 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, d.FailureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
-		gateways, clusterizeFunc, protectFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd, wekaInstallScript,
+		gateways, clusterizeFunc, protectFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd,
+		bash_functions.GetWekaPartitionScript(), wekaInstallScript,
 	)
 	return dedent.Dedent(script)
 }

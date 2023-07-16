@@ -23,6 +23,7 @@ type DeploymentParams struct {
 
 type DeployScriptGenerator struct {
 	FailureDomainCmd string
+	DeviceNameCmd    string
 	Params           DeploymentParams
 	FuncDef          functions_def.FunctionDef
 }
@@ -58,8 +59,22 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 	# get_core_ids bash function definition
 	%s
 
-	# getNetStrForDpdk bash function definitiion
+	# getNetStrForDpdk bash function definition
 	%s
+
+	#deviceNameCmd
+	wekaiosw_device="%s"
+	if [ ! -z "wekaiosw_device" ]; then
+		echo "--------------------------------------------"
+		echo " Creating local filesystem on WekaIO volume "
+		echo "--------------------------------------------"
+		
+		sleep 4
+		mkfs.ext4 -L wekaiosw "$wekaiosw_device" || return 1
+		mkdir -p /opt/weka || return 1
+		mount "$wekaiosw_device" /opt/weka || return 1
+		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
+	fi
 
 	# install script
 	%s
@@ -112,7 +127,7 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, d.FailureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
-		gateways, clusterizeFunc, protectFunc, getCoreIdsFunc, getNetStrForDpdkFunc, wekaInstallScript,
+		gateways, clusterizeFunc, protectFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd, wekaInstallScript,
 	)
 	return dedent.Dedent(script)
 }

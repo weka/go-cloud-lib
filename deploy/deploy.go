@@ -151,7 +151,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 		./install.sh
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 		`
 		installScript += fmt.Sprintf(installTemplate, tarName, packageName)
 	} else {
@@ -176,7 +176,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 		retry 300 2 curl --fail --max-time 10 "$INSTALL_URL" | sh
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 		`
 	}
 	return dedent.Dedent(installScript)

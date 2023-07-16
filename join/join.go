@@ -74,7 +74,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	# wekio partition setup
 	%s
 
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining new instance started\"}"
 
 	random=$$
 	echo $random
@@ -94,7 +94,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl $backend_ip:14000/dist/v1/install | sh
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
 	weka version prepare $VERSION
@@ -188,7 +188,7 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 
 	join_finalization "{\"name\": \"$compute_name\"}"
 	echo "completed successfully" > /tmp/weka_join_completion_validation
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Join completed successfully\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining new instance completed successfully\"}"
 	`
 	s = dedent.Dedent(s)
 	return fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript)

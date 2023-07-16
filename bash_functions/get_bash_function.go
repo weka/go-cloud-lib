@@ -86,3 +86,19 @@ func GetNetStrForDpdk() string {
 func GetHashedPrivateIpBashCmd() string {
 	return "printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16"
 }
+
+func GetWekaPartitionScript() string {
+	s := `
+	if [ ! -z "wekaiosw_device" ]; then
+		echo "--------------------------------------------"
+		echo " Creating local filesystem on WekaIO volume "
+		echo "--------------------------------------------"
+
+		sleep 4
+		mkfs.ext4 -L wekaiosw "$wekaiosw_device" || return 1
+		mkdir -p /opt/weka || return 1
+		mount "$wekaiosw_device" /opt/weka || return 1
+		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
+	fi`
+	return dedent.Dedent(s)
+}

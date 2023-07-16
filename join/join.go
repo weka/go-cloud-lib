@@ -24,6 +24,7 @@ type JoinParams struct {
 
 type JoinScriptGenerator struct {
 	FailureDomainCmd   string
+	DeviceNameCmd      string
 	GetInstanceNameCmd string
 	FindDrivesScript   string
 	ScriptBase         string
@@ -66,6 +67,11 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	%s
 
 	# getNetStrForDpdk bash function definitiion
+	%s
+
+	# deviceNameCmd
+	wekaiosw_device="%s"
+	# wekio partition setup
 	%s
 
 	report -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
@@ -137,7 +143,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	bashScript := fmt.Sprintf(
 		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
 		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, reportFunc, joinFinalizationFunc,
-		getCoreIdsFunc, getNetStrForDpdkFunc,
+		getCoreIdsFunc, getNetStrForDpdkFunc, j.DeviceNameCmd, bash_functions.GetWekaPartitionScript(),
 	)
 	return dedent.Dedent(bashScript)
 }

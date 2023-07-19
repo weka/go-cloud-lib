@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/weka/go-cloud-lib/aws/aws_common"
 	"github.com/weka/go-cloud-lib/connectors"
 	"github.com/weka/go-cloud-lib/lib/jrpc"
 	"github.com/weka/go-cloud-lib/lib/math"
@@ -13,6 +14,7 @@ import (
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 	"math/rand"
+	"os"
 	"sort"
 	strings2 "strings"
 	"time"
@@ -434,6 +436,17 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Running scale down...")
 	response.Version = protocol.Version
+
+	if info.Password == "" {
+		usernameId := os.Getenv("USERNAME_ID")
+		passwordId := os.Getenv("PASSWORD_ID")
+		creds, err2 := aws_common.GetUsernameAndPassword(usernameId, passwordId)
+		if err2 != nil {
+			return
+		}
+		info.Username = creds.Username
+		info.Password = creds.Password
+	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, info.Username, info.Password)

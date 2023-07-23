@@ -89,7 +89,7 @@ func GetHashedPrivateIpBashCmd() string {
 
 func GetWekaPartitionScript() string {
 	s := `
-	if [ ! -z "wekaiosw_device" ]; then
+	if [ ! -z "$wekaiosw_device" ]; then
 		echo "--------------------------------------------"
 		echo " Creating local filesystem on WekaIO volume "
 		echo "--------------------------------------------"

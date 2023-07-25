@@ -18,6 +18,20 @@ func GetHashedPrivateIp(privateIp string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
 
+func GetScriptWithReport(message, reportFunctionDef string) string {
+	s := `
+	#!/bin/bash
+
+	# report function definition
+	%s
+
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"%s\"}"
+
+	echo "%s"
+	`
+	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, message, message)
+}
+
 func GetErrorScript(err error, reportFunctionDef string) string {
 	s := `
 	#!/bin/bash

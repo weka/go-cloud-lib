@@ -3,9 +3,10 @@ package common
 import (
 	"crypto/sha256"
 	"fmt"
-	"github.com/lithammer/dedent"
 	"math/rand"
 	"time"
+
+	"github.com/lithammer/dedent"
 )
 
 func ShuffleSlice(slice []string) {
@@ -17,13 +18,19 @@ func GetHashedPrivateIp(privateIp string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
 
-func GetErrorScript(err error) string {
+func GetErrorScript(err error, reportFunctionDef string) string {
 	s := `
 	#!/bin/bash
+
+	# report function definition
+	%s
+
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"%s\"}"
+
 	<<'###ERROR'
 	%s
 	###ERROR
 	exit 1
 	`
-	return fmt.Sprintf(dedent.Dedent(s), err.Error())
+	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, err.Error(), err.Error())
 }

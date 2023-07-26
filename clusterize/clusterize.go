@@ -76,6 +76,10 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	# clusterize_finalization function definition
 	%s
+
+	last_vm_name=${VMS[${#VMS[@]} - 1]}
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"This ($last_vm_name) is instance $HOSTS_NUM/$HOSTS_NUM that is ready for clusterization\"}"
+
 	if [[ $ADD_FRONTEND == true ]]; then
 		CONTAINER_NAMES+=(frontend0)
 		PORTS+=(16000)

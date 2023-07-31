@@ -11,6 +11,7 @@ type ClusterState struct {
 	DesiredSize int                 `json:"desired_size"`
 	Progress    map[string][]string `json:"progress"`
 	Errors      map[string][]string `json:"errors"`
+	Debug       map[string][]string `json:"debug"`
 	Instances   []string            `json:"instances"`
 	Clusterized bool                `json:"clusterized"`
 }
@@ -32,6 +33,7 @@ type Reports struct {
 	ReadyForClusterization []string            `json:"ready_for_clusterization"`
 	Progress               map[string][]string `json:"progress"`
 	Errors                 map[string][]string `json:"errors"`
+	Debug                  map[string][]string `json:"debug"`
 }
 
 type ClusterCloud struct {

@@ -19,6 +19,11 @@ func UpdateReport(report protocol.Report, state *protocol.ClusterState) (err err
 			state.Progress = make(map[string][]string)
 		}
 		state.Progress[report.Hostname] = append(state.Progress[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
+	case "debug":
+		if state.Debug == nil {
+			state.Debug = make(map[string][]string)
+		}
+		state.Debug[report.Hostname] = append(state.Debug[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
 	default:
 		err = fmt.Errorf("invalid type: %s", report.Type)
 		return

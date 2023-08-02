@@ -3,7 +3,6 @@ module github.com/weka/go-cloud-lib
 go 1.20
 
 require (
-	github.com/aws/aws-sdk-go v1.44.302
 	github.com/google/uuid v1.3.0
 	github.com/justinas/alice v1.2.0
 	github.com/lithammer/dedent v1.1.0
@@ -13,7 +12,6 @@ require (
 
 require (
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/rs/xid v1.4.0 // indirect

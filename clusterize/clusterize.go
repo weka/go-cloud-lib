@@ -25,6 +25,7 @@ type ClusterParams struct {
 	WekaUsername      string
 	WekaPassword      string
 	SetObs            bool
+	SmbwEnabled       bool
 	ObsScript         string
 	DataProtection    DataProtectionParams
 	InstallDpdk       bool
@@ -53,6 +54,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	HOSTS_NUM=%d
 	NVMES_NUM=%d
 	SET_OBS=%t
+	SMBW_ENABLED=%t
 	STRIPE_WIDTH=%d
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
@@ -143,8 +145,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster drive
 	weka cluster container
 	
-	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
 	weka fs group create default
+	# for SMBW setup we need to create a separate fs with 10GB capacity
+	if [[ $SMBW_ENABLED == true ]]; then
+	    weka fs create .config_fs default 10GB
+	fi
+	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
 	weka fs create default default "$full_capacity"B
 
 	if [[ $INSTALL_DPDK == true ]]; then
@@ -172,7 +178,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	`
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,
-		params.SetObs, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
+		params.SetObs, params.SmbwEnabled, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
 		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.ProxyUrl, params.FindDrivesScript,
 		reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
 	)

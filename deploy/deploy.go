@@ -18,6 +18,7 @@ type DeploymentParams struct {
 	WekaToken      string
 	InstallDpdk    bool
 	NicsNum        string
+	ProxyUrl       string
 	Gateways       []string
 }
 
@@ -133,8 +134,10 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	%s
 	TOKEN="%s"
 	INSTALL_URL="%s"
+	PROXY_URL="%s"
 	`
-	installScript := fmt.Sprintf(installScriptTemplate, reportFuncDef, d.Params.WekaToken, installUrl)
+	installScript := fmt.Sprintf(
+		installScriptTemplate, reportFuncDef, d.Params.WekaToken, installUrl, d.Params.ProxyUrl)
 
 	if strings.HasSuffix(installUrl, ".tar") {
 		split := strings.Split(installUrl, "/")
@@ -148,10 +151,6 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		cd /tmp
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME
-
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-		./install.sh
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 		`
 		installScript += fmt.Sprintf(installTemplate, tarName, packageName)
 	} else {
@@ -174,10 +173,16 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 			return 0
 		}
 
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-		retry 300 2 curl --fail --max-time 10 "$INSTALL_URL" | sh
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
+		retry 300 2 curl --fail --proxy "$PROXY_URL" --max-time 10 "$INSTALL_URL" -o install.sh
 		`
 	}
+
+	installScript += `
+	chmod +x install.sh
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+	PROXY="$PROXY_URL" ./install.sh
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
+	`
+
 	return dedent.Dedent(installScript)
 }

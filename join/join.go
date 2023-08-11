@@ -20,6 +20,7 @@ type JoinParams struct {
 	InstallDpdk    bool
 	InstanceParams protocol.BackendCoreCount
 	Gateways       []string
+	ProxyUrl       string
 }
 
 type JoinScriptGenerator struct {
@@ -56,6 +57,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	INSTALL_DPDK=%t
 	GATEWAYS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
+	PROXY_URL="%s"
 
 	# report function definition
 	%s
@@ -93,7 +95,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	done
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-	curl $backend_ip:14000/dist/v1/install | sh
+	curl $backend_ip:14000/dist/v1/install -o install.sh
+	chmod +x install.sh
+	PROXY="$PROXY_URL" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
@@ -142,8 +146,8 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
 		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
-		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, reportFunc, joinFinalizationFunc,
-		getCoreIdsFunc, getNetStrForDpdkFunc, j.DeviceNameCmd, bash_functions.GetWekaPartitionScript(),
+		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, j.Params.ProxyUrl, reportFunc,
+		joinFinalizationFunc, getCoreIdsFunc, getNetStrForDpdkFunc, j.DeviceNameCmd, bash_functions.GetWekaPartitionScript(),
 	)
 	return dedent.Dedent(bashScript)
 }

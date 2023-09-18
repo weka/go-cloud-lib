@@ -183,11 +183,32 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 	return toDeactivate
 }
 
-func getDriveContainers(hostInfo []hostInfo) (driveContainers []hostInfo) {
-	for _, host := range hostInfo {
-		if strings2.Contains(host.ContainerName, "drive") {
-			driveContainers = append(driveContainers, host)
+func getMachineDriveContainerByHost(hosts []hostInfo, host hostInfo) (hostInfo, error) {
+	if strings2.Contains(host.ContainerName, "drive") {
+		return host, nil
+	}
+
+	for _, currentHost := range hosts {
+		if strings2.Contains(currentHost.ContainerName, "drive") && currentHost.HostIp == host.HostIp {
+			return currentHost, nil
 		}
+	}
+	return hostInfo{}, fmt.Errorf("no drive container found for machine %s", host.HostIp)
+}
+
+func getDriveContainers(hostInfo []hostInfo) (driveContainers []hostInfo, err error) {
+	hostsIps := make(map[string]types.Nilt)
+	for _, host := range hostInfo {
+		if _, ok := hostsIps[host.HostIp]; ok {
+			continue
+		}
+		driveContainer, err2 := getMachineDriveContainerByHost(hostInfo, host)
+		if err2 != nil {
+			err = err2
+			return
+		}
+		hostsIps[host.HostIp] = types.Nilv
+		driveContainers = append(driveContainers, driveContainer)
 	}
 	return
 }
@@ -589,7 +610,11 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response, hosts)
 	removeOldDrives(ctx, driveApiList, jpool, &response)
 
-	driveContainers := getDriveContainers(hostsList)
+	driveContainers, err := getDriveContainers(hostsList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
 	machinesNumber := len(driveContainers)
 	logger.Info().Msgf("Machines number:%d, Desired number:%d", machinesNumber, info.DesiredCapacity)
 	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)

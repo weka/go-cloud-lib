@@ -17,6 +17,7 @@ import (
 	"github.com/weka/go-cloud-lib/lib/weka"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+	"github.com/weka/go-cloud-lib/weka_events"
 
 	"github.com/google/uuid"
 )
@@ -57,6 +58,12 @@ type hostInfo struct {
 	drives     driveMap
 	nodes      nodeMap
 	scaleState hostState
+}
+
+type deactivateEventInfo struct {
+	currentSize int
+	desiredSize int
+	reason      string
 }
 
 func (host hostInfo) belongsToHgIpBased(instances []protocol.HgInstance) bool {
@@ -288,10 +295,10 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 	return
 }
 
-func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, inactiveHosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse, allHostsMap hostsMap) {
+func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, inactiveHosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse, allHostsMap hostsMap, eventParams *deactivateEventInfo) {
 	logger := logging.LoggerFromCtx(ctx)
 	for _, host := range inactiveHosts {
-		deactivateHost(ctx, jpool, hostsApiList, p, host)
+		deactivateHost(ctx, jpool, hostsApiList, p, host, eventParams)
 		logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
 		jpool.Drop(host.HostIp)
 		containers := getMachineContainers(ctx, hostsApiList, host)
@@ -403,7 +410,7 @@ func allContainersInactive(hostsApiList weka.HostListResponse, containers machin
 	return true
 }
 
-func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.HostListResponse, response *protocol.ScaleResponse, host hostInfo) {
+func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.HostListResponse, response *protocol.ScaleResponse, host hostInfo, eventParams *deactivateEventInfo) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Trying to deactivate machine %s...", host.HostIp)
 	for _, drive := range host.drives {
@@ -427,6 +434,15 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 		containers.Compute,
 		containers.Frontend,
 	)
+	// send weka event
+	message := fmt.Sprintf(
+		"Trying to deactivate machine %s. Desired size: %d, current size: %d, reason: %s.",
+		host.HostIp,
+		eventParams.desiredSize,
+		eventParams.currentSize,
+		eventParams.reason,
+	)
+	weka_events.EmitCustomEventUsingJPool(ctx, message, jpool)
 
 	var hostIds []weka.HostId
 	if containers.Drive.String() != "" {
@@ -634,7 +650,6 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return a.AddedTime.Before(b.AddedTime)
 	})
 
-	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response, hosts)
 	removeOldDrives(ctx, driveApiList, jpool, &response)
 
 	driveContainers, err := getDriveContainers(hostsList)
@@ -644,14 +659,25 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	}
 	machinesNumber := len(driveContainers)
 	logger.Info().Msgf("Machines number:%d, Desired number:%d", machinesNumber, info.DesiredCapacity)
+
+	eventParams := deactivateEventInfo{
+		currentSize: machinesNumber,
+		desiredSize: info.DesiredCapacity,
+		reason:      "inactive host",
+	}
+
+	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response, hosts, &eventParams)
+
 	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)
 
 	for _, host := range driveContainers[:numToDeactivate] {
-		deactivateHost(ctx, jpool, hostsApiList, &response, host)
+		eventParams.reason = "scale down"
+		deactivateHost(ctx, jpool, hostsApiList, &response, host, &eventParams)
 	}
 
 	for _, host := range downHosts {
-		deactivateHost(ctx, jpool, hostsApiList, &response, host)
+		eventParams.reason = "down host"
+		deactivateHost(ctx, jpool, hostsApiList, &response, host, &eventParams)
 	}
 
 	for _, host := range hostsList {

@@ -18,8 +18,6 @@ type EmitEventParams struct {
 }
 
 func EmitCustomEvent(ctx context.Context, params EmitEventParams) error {
-	logger := logging.LoggerFromCtx(ctx)
-
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, params.Username, params.Password)
 	}
@@ -32,8 +30,14 @@ func EmitCustomEvent(ctx context.Context, params EmitEventParams) error {
 		Ctx:     ctx,
 	}
 
+	return EmitCustomEventUsingJPool(ctx, params.Message, jpool)
+}
+
+func EmitCustomEventUsingJPool(ctx context.Context, message string, jpool *jrpc.Pool) error {
+	logger := logging.LoggerFromCtx(ctx)
+
 	input := types.JsonDict{
-		"message": params.Message,
+		"message": message,
 	}
 
 	err := jpool.Call(weka.JrpcEmitCustomEvent, input, nil)

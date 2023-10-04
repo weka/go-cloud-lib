@@ -1,8 +1,9 @@
 package weka
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type JrpcMethod string
@@ -16,6 +17,7 @@ const (
 	JrpcDeactivateDrives JrpcMethod = "cluster_deactivate_drives"
 	JrpcDeactivateHosts  JrpcMethod = "cluster_deactivate_hosts"
 	JrpcStatus           JrpcMethod = "status"
+	JrpcEmitCustomEvent  JrpcMethod = "events_trigger_custom"
 )
 
 type HostListResponse map[HostId]Host

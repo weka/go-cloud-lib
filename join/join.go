@@ -190,6 +190,8 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	done
 	weka cluster drive scan $host_id
 
+	weka events trigger-event "Scale up operation completed on host $HOSTNAME, data redistribution may still be running"
+
 	join_finalization "{\"name\": \"$compute_name\"}"
 	echo "completed successfully" > /tmp/weka_join_completion_validation
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining new instance completed successfully\"}"

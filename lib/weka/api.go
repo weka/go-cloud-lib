@@ -59,6 +59,7 @@ type Host struct {
 		InstanceId string `json:"instance_id"`
 	} `json:"aws"`
 	ContainerName string `json:"container_name"`
+	Mode          string `json:"mode"`
 }
 
 type Drive struct {

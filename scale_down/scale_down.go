@@ -155,6 +155,9 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 
 	machines := make(map[string]*machineState)
 	for _, host := range hostInfo {
+		if host.Mode == "client" {
+			logger.Warn().Msgf("Skipping client host scaleState check %s:%s", host.HostIp, host.id)
+		}
 		if _, ok := machines[host.HostIp]; !ok {
 			machines[host.HostIp] = &machineState{0, 0, 0}
 		}
@@ -184,12 +187,12 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 }
 
 func getMachineDriveContainerByHost(hosts []hostInfo, host hostInfo) (hostInfo, error) {
-	if strings2.Contains(host.ContainerName, "drive") {
+	if host.Mode == "backend" && strings2.Contains(host.ContainerName, "drive") {
 		return host, nil
 	}
 
 	for _, currentHost := range hosts {
-		if strings2.Contains(currentHost.ContainerName, "drive") && currentHost.HostIp == host.HostIp {
+		if currentHost.Mode == "backend" && strings2.Contains(currentHost.ContainerName, "drive") && currentHost.HostIp == host.HostIp {
 			return currentHost, nil
 		}
 	}
@@ -232,6 +235,11 @@ func isAllowedToScale(status weka.StatusResponse) error {
 
 func deriveHostState(ctx context.Context, host *hostInfo) hostState {
 	logger := logging.LoggerFromCtx(ctx)
+
+	if host.Mode == "client" {
+		logger.Warn().Msgf("Skipping client host state derive %s:%s", host.HostIp, host.id)
+		return HEALTHY
+	}
 
 	if strings2.Contains(host.ContainerName, "drive") && host.allDisksBeingRemoved() {
 		logger.Info().Msgf("Marking %s as deactivating due to unhealthy disks", host.id.String())
@@ -355,11 +363,11 @@ type machineContainers struct {
 func getMachineContainers(hostsApiList weka.HostListResponse, inputHost hostInfo) (containers machineContainers) {
 	for hostId, host := range hostsApiList {
 		if host.HostIp == inputHost.HostIp {
-			if strings2.Contains(host.ContainerName, "compute") {
+			if host.Mode == "backend" && strings2.Contains(host.ContainerName, "compute") {
 				containers.Compute = hostId
-			} else if strings2.Contains(host.ContainerName, "frontend") {
+			} else if host.Mode == "backend" && strings2.Contains(host.ContainerName, "frontend") {
 				containers.Frontend = hostId
-			} else {
+			} else if host.Mode == "backend" && strings2.Contains(host.ContainerName, "drive") {
 				containers.Drive = hostId
 			}
 		}
@@ -430,7 +438,7 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 
 func isMBC(hostsApiList weka.HostListResponse) bool {
 	for _, host := range hostsApiList {
-		if strings2.Contains(host.ContainerName, "drive") {
+		if host.Mode == "backend" && strings2.Contains(host.ContainerName, "drive") {
 			return true
 		}
 	}
@@ -538,6 +546,10 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 	inactiveOrDownHostsIps := make(map[string]types.Nilt)
 	for _, host := range hosts {
+		if host.Mode == "client" {
+			logger.Info().Msgf("Skipping client host %s:%s", host.HostIp, host.id)
+		}
+
 		if _, ok := inactiveOrDownHostsIps[host.HostIp]; ok {
 			continue
 		}

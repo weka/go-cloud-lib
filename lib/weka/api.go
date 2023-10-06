@@ -61,6 +61,7 @@ type Host struct {
 	ContainerName     string `json:"container_name"`
 	Mode              string `json:"mode"`
 	MachineIdentifier string `json:"machine_identifier"`
+	AutoRemoveTimeout int    `json:"auto_remove_timeout"`
 }
 
 type Drive struct {

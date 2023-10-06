@@ -664,5 +664,69 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		})
 	}
 
+	validateDelta(ctx, response, jpool, info)
 	return
+}
+
+func validateDelta(ctx context.Context, response protocol.ScaleResponse, jpool *jrpc.Pool, info protocol.HostGroupInfoResponse) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Validating delta")
+
+	hostsApiList := weka.HostListResponse{}
+	err := jpool.Call(weka.JrpcHostList, struct{}{}, &hostsApiList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	systemContainersIps := map[string]types.Nilt{}
+	responseContainerIps := map[string]types.Nilt{}
+	cloudIps := map[string]types.Nilt{}
+	deltaMap := map[string]types.Nilt{}
+
+	for _, host := range hostsApiList {
+		systemContainersIps[host.HostIp] = types.Nilv
+	}
+
+	for _, host := range response.Hosts {
+		responseContainerIps[host.PrivateIp] = types.Nilv
+	}
+
+	for _, instance := range info.Instances {
+		cloudIps[instance.PrivateIp] = types.Nilv
+	}
+
+CloudIps:
+	for ip := range cloudIps {
+		if _, ok := responseContainerIps[ip]; !ok {
+			deltaMap[ip] = types.Nilv
+			continue CloudIps
+		}
+		for _, toTerminate := range response.ToTerminate {
+			if toTerminate.PrivateIp == ip {
+				deltaMap[ip] = types.Nilv
+				continue CloudIps
+			}
+		}
+	}
+
+	deltaIps := []string{}
+	for ip := range deltaMap {
+		deltaIps = append(deltaIps, ip)
+	}
+
+	logger.Info().Msgf("delta ips: %v", deltaIps)
+
+	for terminatingIp, _ := range deltaMap {
+		for _, host := range hostsApiList {
+			if host.HostIp == terminatingIp && host.State != "INACTIVE" {
+				if host.Status == "DOWN" && host.Mode == "client" && host.AutoRemoveTimeout > 0 {
+					logger.Warn().Msgf("detected IP collision between client and backend with ip %s, ignoring as client is down ", host.HostIp)
+					continue
+				}
+				logger.Fatal().Msgf("aborting scale down. instance with IP that exists in system and belongs to non-inactive container was targeted for termination: %s", host.HostIp)
+			}
+		}
+	}
+
 }

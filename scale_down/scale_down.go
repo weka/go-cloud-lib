@@ -715,7 +715,7 @@ CloudIps:
 		deltaIps = append(deltaIps, ip)
 	}
 
-	logger.Info().Msgf("delta ips: %v", deltaIps)
+	logger.Info().Msgf("delta ips for termination: %v", deltaIps)
 
 	for terminatingIp, _ := range deltaMap {
 		for _, host := range hostsApiList {

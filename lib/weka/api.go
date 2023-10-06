@@ -58,8 +58,9 @@ type Host struct {
 	Aws              struct {
 		InstanceId string `json:"instance_id"`
 	} `json:"aws"`
-	ContainerName string `json:"container_name"`
-	Mode          string `json:"mode"`
+	ContainerName     string `json:"container_name"`
+	Mode              string `json:"mode"`
+	MachineIdentifier string `json:"machine_identifier"`
 }
 
 type Drive struct {

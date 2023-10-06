@@ -294,7 +294,7 @@ func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, ina
 		deactivateHost(ctx, jpool, hostsApiList, p, host)
 		logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
 		jpool.Drop(host.HostIp)
-		containers := getMachineContainers(hostsApiList, host)
+		containers := getMachineContainers(ctx, hostsApiList, host)
 
 		containrs := []weka.HostId{
 			containers.Drive,
@@ -360,9 +360,16 @@ type machineContainers struct {
 	Drive    weka.HostId `json:"drive"`
 }
 
-func getMachineContainers(hostsApiList weka.HostListResponse, inputHost hostInfo) (containers machineContainers) {
+func getMachineContainers(ctx context.Context, hostsApiList weka.HostListResponse, inputHost hostInfo) (containers machineContainers) {
+	logger := logging.LoggerFromCtx(ctx)
+	counter := 0
+	machineIdentifiers := make(map[string]types.Nilt)
 	for hostId, host := range hostsApiList {
 		if host.HostIp == inputHost.HostIp {
+			if host.Mode == "backend" {
+				counter++
+				machineIdentifiers[host.MachineIdentifier] = types.Nilv
+			}
 			if host.Mode == "backend" && strings2.Contains(host.ContainerName, "compute") {
 				containers.Compute = hostId
 			} else if host.Mode == "backend" && strings2.Contains(host.ContainerName, "frontend") {
@@ -372,10 +379,18 @@ func getMachineContainers(hostsApiList weka.HostListResponse, inputHost hostInfo
 			}
 		}
 	}
+
+	if counter > 3 {
+		logger.Fatal().Msgf("Found more than 3 backend containers for host %s", inputHost.HostIp)
+	}
+	if len(machineIdentifiers) > 1 {
+		logger.Fatal().Msgf("Found more than 1 machine identifier for host %s", inputHost.HostIp)
+	}
+
 	return
 }
 
-func isMachineInactive(hostsApiList weka.HostListResponse, containers machineContainers) bool {
+func allContainersInactive(hostsApiList weka.HostListResponse, containers machineContainers) bool {
 	if containers.Drive.String() != "" && hostsApiList[containers.Drive].State != "INACTIVE" {
 		return false
 	}
@@ -404,7 +419,7 @@ func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.Hos
 		}
 	}
 
-	containers := getMachineContainers(hostsApiList, host)
+	containers := getMachineContainers(ctx, hostsApiList, host)
 	logger.Info().Msgf(
 		"Trying to deactivate machine %s containers drive:%s compute:%s frontend:%s",
 		host.HostIp,
@@ -556,9 +571,9 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 		switch host.State {
 		case "INACTIVE":
-			containers := getMachineContainers(hostsApiList, host)
+			containers := getMachineContainers(ctx, hostsApiList, host)
 			if host.belongsToHgIpBased(info.Instances) {
-				if isMachineInactive(hostsApiList, containers) {
+				if allContainersInactive(hostsApiList, containers) {
 					logger.Info().Msgf("Inactive machine found: %s", host.HostIp)
 					inactiveHosts = append(inactiveHosts, hosts[containers.Drive])
 					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
@@ -587,7 +602,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 			if info.Role == "backend" {
 				if host.State != "INACTIVE" && host.managementTimedOut(downKickOutTimeout) {
 					logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
-					downHosts = append(downHosts, hosts[getMachineContainers(hostsApiList, host).Drive])
+					downHosts = append(downHosts, hosts[getMachineContainers(ctx, hostsApiList, host).Drive])
 					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 					continue
 				}

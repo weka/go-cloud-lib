@@ -164,6 +164,7 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 	for _, host := range hostInfo {
 		if host.Mode == "client" {
 			logger.Warn().Msgf("Skipping client host scaleState check %s:%s", host.HostIp, host.id)
+			continue
 		}
 		if _, ok := machines[host.HostIp]; !ok {
 			machines[host.HostIp] = &machineState{0, 0, 0}
@@ -338,6 +339,8 @@ func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, ina
 			removeDrive(ctx, jpool, drive, p)
 		}
 	}
+
+	logger.Info().Msgf("Instances set to termination %s", p.ToTerminate)
 	return
 }
 
@@ -579,6 +582,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	for _, host := range hosts {
 		if host.Mode == "client" {
 			logger.Info().Msgf("Skipping client host %s:%s", host.HostIp, host.id)
+			continue
 		}
 
 		if _, ok := inactiveOrDownHostsIps[host.HostIp]; ok {

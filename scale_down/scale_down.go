@@ -748,13 +748,14 @@ CloudIps:
 	logger.Info().Msgf("delta ips for termination: %v", deltaIps)
 
 	for terminatingIp, _ := range deltaMap {
-		for _, host := range hostsApiList {
+		for hostId, host := range hostsApiList {
 			if host.HostIp == terminatingIp && host.State != "INACTIVE" {
 				if host.Status == "DOWN" && host.Mode == "client" && host.AutoRemoveTimeout > 0 {
-					logger.Warn().Msgf("detected IP collision between client and backend with ip %s, ignoring as client is down ", host.HostIp)
+					logger.Warn().Msgf("Detected IP collision between client and backend with ip %s, ignoring as client is down ", host.HostIp)
 					continue
 				}
-				logger.Fatal().Msgf("aborting scale down. instance with IP that exists in system and belongs to non-inactive container was targeted for termination: %s", host.HostIp)
+				hostInfo := fmt.Sprintf("%s:%s:%s:%s:%s", host.Mode, hostId, host.ContainerName, host.Status, host.State)
+				logger.Fatal().Msgf("Aborting scale down. Instance with IP that exists in system and belongs to non-inactive container %s was targeted for termination: %s", hostInfo, host.HostIp)
 			}
 		}
 	}

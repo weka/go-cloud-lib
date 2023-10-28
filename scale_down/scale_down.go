@@ -749,7 +749,7 @@ CloudIps:
 
 	for terminatingIp, _ := range deltaMap {
 		for hostId, host := range hostsApiList {
-			if host.HostIp == terminatingIp && host.State != "INACTIVE" {
+			if host.HostIp == terminatingIp && host.State != "INACTIVE" && host.State != "REMOVING" {
 				if host.Status == "DOWN" && host.Mode == "client" && host.AutoRemoveTimeout > 0 {
 					logger.Warn().Msgf("Detected IP collision between client and backend with ip %s, ignoring as client is down ", host.HostIp)
 					continue

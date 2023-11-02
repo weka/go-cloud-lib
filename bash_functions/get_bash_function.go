@@ -7,37 +7,40 @@ import (
 func GetCoreIds() string {
 	s := `
 	set -ex
-	numa_range=()
+	numa_ranges=()
 	numa=()
-	create_numa_range() {
+
+	append_numa_core_ids_to_list() {
 		r=$1
 		dynamic_array=$2
-		start_value=$(echo "$r" | awk -F"-" '{print $1}')
-		end_value=$(echo "$r" | awk -F"-" '{print $2}')
+		numa_min=$(echo "$r" | awk -F"-" '{print $1}')
+		numa_max=$(echo "$r" | awk -F"-" '{print $2}')
 
-		for (( i=$(($start_value + 1)) ; i<=$end_value ; i++ )); do
-				rem=$(( $i % 2 ))
-				if [[ $rem -eq 0 ]]; then
-					dynamic_array+=("$i")
-				fi
-		done
+		thread_siblings_list=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list)
+		while IFS= read -r thread_siblings; do
+			core_id=$(echo "$thread_siblings" | cut -d '-' -f 1 |  cut -d ',' -f 1)
+			if [[ $core_id -ne 0 && $core_id -ge $numa_min && $core_id -le $numa_max && ! ${dynamic_array[@]} =~ $core_id ]];then
+				dynamic_array+=($core_id)
+			fi
+		done <<< "$thread_siblings_list"
 	}
+
 	numa_num=$(lscpu | grep "NUMA node(s):" | awk '{print $3}')
 	
 	for ((i=0; i<$numa_num; i++));do
 		numa_ids=$(lscpu | grep "NUMA node$i CPU(s):" | awk '{print $4}')
-		numa_range[$i]=$numa_ids
+		numa_ranges[$i]=$numa_ids
 	done
 	for ((j=0; j<$numa_num; j++)); do
     		dynamic_array=()
-			if [[ "${numa_range[$j]}" =~ "," ]]; then
-				IFS=',' read -ra range <<< "${numa_range[$j]}"
+			if [[ "${numa_ranges[$j]}" =~ "," ]]; then
+				IFS=',' read -ra range <<< "${numa_ranges[$j]}"
 				for i in "${range[@]}"; do
-					create_numa_range "$i" $dynamic_array
+					append_numa_core_ids_to_list "$i" $dynamic_array
 					numa[$j]="${dynamic_array[@]}"
 				done
 			else
-				create_numa_range "${numa_range[$j]}" $dynamic_array
+				append_numa_core_ids_to_list "${numa_ranges[$j]}" $dynamic_array
 				numa[$j]="${dynamic_array[@]}"
 			fi
 	done

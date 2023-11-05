@@ -147,8 +147,9 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		TAR_NAME=%s
 		PACKAGE_NAME=%s
 
-		gsutil cp "$INSTALL_URL" /tmp || wget -P /tmp "$INSTALL_URL"
+		#gsutil cp "$INSTALL_URL" /tmp || wget -P /tmp "$INSTALL_URL"
 		cd /tmp
+		az storage blob download --account-name wekatars --container-name tars --name weka-4.2.1.tar --file weka-4.2.1.tar --auth-mode login
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME
 		`

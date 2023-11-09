@@ -112,7 +112,7 @@ func GetWekaPartitionScript() string {
 		echo "--------------------------------------------"
 
 		sleep 4
-		mkfs.ext4 -L wekaiosw "$wekaiosw_device" || return 1
+		mkfs.ext4 -F -L wekaiosw "$wekaiosw_device" || return 1
 		mkdir -p /opt/weka || return 1
 		mount "$wekaiosw_device" /opt/weka || return 1
 		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab

@@ -162,7 +162,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 			az storage blob download --account-name "$storage_account_name" --container-name "$container_name" --name "$object_name" --file /tmp/"$object_name" --auth-mode login
 		}
 
-		gsutil cp "$INSTALL_URL" /tmp || azure_download || wget -P /tmp "$INSTALL_URL"
+		gsutil cp "$INSTALL_URL" /tmp || wget -P /tmp "$INSTALL_URL" -o $TAR_NAME
 		cd /tmp
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME

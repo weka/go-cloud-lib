@@ -140,29 +140,16 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	installScript := fmt.Sprintf(
 		installScriptTemplate, reportFuncDef, d.Params.WekaToken, installUrl, d.Params.ProxyUrl)
 
-	if strings.HasSuffix(installUrl, ".tar") {
-		split := strings.Split(installUrl, "/")
+	if strings.HasSuffix(installUrl, ".tar") || strings.Contains(installUrl, ".tar?") {
+		split := strings.Split(installUrl, "?")
+		split = strings.Split(split[0], "/")
 		tarName := split[len(split)-1]
 		packageName := strings.TrimSuffix(tarName, ".tar")
 		installTemplate := `
 		TAR_NAME=%s
 		PACKAGE_NAME=%s
 
-		function azure_download() {
-			IFS='/' read -ra install_url_parts <<< "$INSTALL_URL"
-			len=${#install_url_parts[@]}
-			object_name=${install_url_parts[len-1]}
-			container_name=${install_url_parts[len-2]}
-
-			IFS='.' read -ra storage_account_parts <<< "${install_url_parts[len-3]}"
-
-			storage_account_name=${storage_account_parts[0]}
-
-			echo "storage_account_name: $storage_account_name  container_name: $container_name  object_name: $object_name"
-			az storage blob download --account-name "$storage_account_name" --container-name "$container_name" --name "$object_name" --file /tmp/"$object_name" --auth-mode login
-		}
-
-		gsutil cp "$INSTALL_URL" /tmp || azure_download || wget -P /tmp "$INSTALL_URL"
+		gsutil cp "$INSTALL_URL" /tmp || wget "$INSTALL_URL" -o /tmp/$TAR_NAME
 		cd /tmp
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME

@@ -182,6 +182,14 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	installScript += `
 	chmod +x install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+	status_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600')
+	if [[ "$status_code" -eq 200 ]] ; then
+		echo "Succeeded to get aws token"
+	else
+		echo "Failed to get aws token"
+		sed -i -e 's/--noproxy \".amazonaws.com\"//g' ./install.sh
+		sed -i '/no_proxy/d' install.sh
+	fi
 	PROXY="$PROXY_URL" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 	`

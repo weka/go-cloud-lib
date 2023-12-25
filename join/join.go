@@ -24,7 +24,6 @@ type JoinParams struct {
 }
 
 type JoinScriptGenerator struct {
-	FailureDomainCmd   string
 	DeviceNameCmd      string
 	GetInstanceNameCmd string
 	FindDrivesScript   string
@@ -40,6 +39,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
 	gateways := strings.Join(j.Params.Gateways, " ")
+	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
 	ips := j.Params.IPs
 	common.ShuffleSlice(ips)
@@ -145,7 +145,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
-		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
+		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), failureDomainCmd,
 		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, j.Params.ProxyUrl, reportFunc,
 		joinFinalizationFunc, getCoreIdsFunc, getNetStrForDpdkFunc, j.DeviceNameCmd, bash_functions.GetWekaPartitionScript(),
 	)

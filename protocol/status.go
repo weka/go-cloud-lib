@@ -30,7 +30,7 @@ type ClusterState struct {
 	Progress             map[string][]string `json:"progress"`
 	Errors               map[string][]string `json:"errors"`
 	Debug                map[string][]string `json:"debug"`
-	Instances            []string            `json:"instances"`
+	Instances            []Vm            `json:"instances"`
 	Clusterized          bool                `json:"clusterized"`
 	ClusterizationTarget int                 `json:"clusterization_target"`
 	Updates              map[string]Update   `json:"updates,omitempty"`

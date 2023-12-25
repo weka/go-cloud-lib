@@ -44,7 +44,7 @@ type ClusterizeScriptGenerator struct {
 
 func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	reportFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
-	clusterizeFinFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalizaition)
+	clusterizeFinFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization)
 	params := c.Params
 
 	clusterizeScriptTemplate := `

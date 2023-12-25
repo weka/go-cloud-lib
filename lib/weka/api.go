@@ -9,20 +9,23 @@ import (
 type JrpcMethod string
 
 const (
-	JrpcHostList         JrpcMethod = "hosts_list"
-	JrpcNodeList         JrpcMethod = "nodes_list"
-	JrpcDrivesList       JrpcMethod = "disks_list"
-	JrpcRemoveDrive      JrpcMethod = "cluster_remove_drives"
-	JrpcRemoveHost       JrpcMethod = "cluster_remove_host"
-	JrpcDeactivateDrives JrpcMethod = "cluster_deactivate_drives"
-	JrpcDeactivateHosts  JrpcMethod = "cluster_deactivate_hosts"
-	JrpcStatus           JrpcMethod = "status"
-	JrpcEmitCustomEvent  JrpcMethod = "events_trigger_custom"
+	JrpcHostList                 JrpcMethod = "hosts_list"
+	JrpcNodeList                 JrpcMethod = "nodes_list"
+	JrpcDrivesList               JrpcMethod = "disks_list"
+	JrpcRemoveDrive              JrpcMethod = "cluster_remove_drives"
+	JrpcRemoveHost               JrpcMethod = "cluster_remove_host"
+	JrpcDeactivateDrives         JrpcMethod = "cluster_deactivate_drives"
+	JrpcDeactivateHosts          JrpcMethod = "cluster_deactivate_hosts"
+	JrpcStatus                   JrpcMethod = "status"
+	JrpcEmitCustomEvent          JrpcMethod = "events_trigger_custom"
+	JrpcInterfaceGroupList       JrpcMethod = "interface_group_list"
+	JrpcinterfaceGroupDeletePort JrpcMethod = "interface_group_delete_port"
 )
 
 type HostListResponse map[HostId]Host
 type DriveListResponse map[DriveId]Drive
 type NodeListResponse map[NodeId]Node
+type InterfaceGroupListResponse []InterfaceGroup
 
 type Activity struct {
 	NumOps                    float32 `json:"num_ops"`
@@ -78,4 +81,23 @@ type Node struct {
 	Status          string     `json:"status"`
 	UpSince         *time.Time `json:"up_since"`
 	HostId          HostId     `json:"host_id"`
+}
+
+type InterfaceGroupPort struct {
+	HostUid string `json:"host_uid"`
+	HostId  HostId `json:"host_id"`
+	Port    string `json:"port"`
+	Status  string `json:"status"`
+}
+
+type InterfaceGroup struct {
+	SubnetMask      string               `json:"subnet_mask"`
+	Ports           []InterfaceGroupPort `json:"ports"`
+	Name            string               `json:"name"`
+	Uid             string               `json:"uid"`
+	Ips             []string             `json:"ips"`
+	AllowManageGids bool                 `json:"allow_manage_gids"`
+	Type            string               `json:"type"`
+	Gateway         string               `json:"gateway"`
+	Status          string               `json:"status"`
 }

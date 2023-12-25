@@ -25,7 +25,6 @@ import (
 type hostState int
 
 const unhealthyDeactivateTimeout = 120 * time.Minute
-const backendCleanupDelay = 5 * time.Minute // Giving own HG chance to take care
 const downKickOutTimeout = 3 * time.Hour
 
 func (h hostState) String() string {
@@ -60,10 +59,18 @@ type hostInfo struct {
 	scaleState hostState
 }
 
+type EventReason string
+
+const (
+	ScaleDownEvent       EventReason = "scale down"
+	InactiveMachineEvent EventReason = "inactive machine"
+	DownMachineEvent     EventReason = "down machine"
+)
+
 type deactivateEventInfo struct {
 	currentSize int
 	desiredSize int
-	reason      string
+	reason      EventReason
 }
 
 func (host hostInfo) belongsToHgIpBased(instances []protocol.HgInstance) bool {
@@ -132,10 +139,6 @@ func (host hostInfo) managementTimedOut(timeout time.Duration) bool {
 	return false
 }
 
-func remoteDownHosts(hosts []hostInfo, jpool *jrpc.Pool) {
-
-}
-
 type machineState struct {
 	Healthy      int
 	Unhealthy    int
@@ -192,36 +195,6 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 	toDeactivate := CalculateDeactivateTarget(nHealthy, nUnhealthy, nDeactivating, desired)
 	logger.Info().Msgf("%d machines set to deactivate. nHealthy: %d nUnhealthy:%d nDeactivating: %d desired:%d", toDeactivate, nHealthy, nUnhealthy, nDeactivating, desired)
 	return toDeactivate
-}
-
-func getMachineDriveContainerByHost(hosts []hostInfo, host hostInfo) (hostInfo, error) {
-	if host.Mode == "backend" && strings2.Contains(host.ContainerName, "drive") {
-		return host, nil
-	}
-
-	for _, currentHost := range hosts {
-		if currentHost.Mode == "backend" && strings2.Contains(currentHost.ContainerName, "drive") && currentHost.HostIp == host.HostIp {
-			return currentHost, nil
-		}
-	}
-	return hostInfo{}, fmt.Errorf("no drive container found for machine %s", host.HostIp)
-}
-
-func getDriveContainers(hostInfo []hostInfo) (driveContainers []hostInfo, err error) {
-	hostsIps := make(map[string]types.Nilt)
-	for _, host := range hostInfo {
-		if _, ok := hostsIps[host.HostIp]; ok {
-			continue
-		}
-		driveContainer, err2 := getMachineDriveContainerByHost(hostInfo, host)
-		if err2 != nil {
-			err = err2
-			return
-		}
-		hostsIps[host.HostIp] = types.Nilv
-		driveContainers = append(driveContainers, driveContainer)
-	}
-	return
 }
 
 func CalculateDeactivateTarget(nHealthy int, nUnhealthy int, nDeactivating int, desired int) int {
@@ -296,47 +269,39 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 	return
 }
 
-func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, inactiveHosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse, allHostsMap hostsMap, eventParams *deactivateEventInfo) {
+func removeInactive(ctx context.Context, inactiveMachines map[string][]hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
 	logger := logging.LoggerFromCtx(ctx)
-	for _, host := range inactiveHosts {
-		deactivateHost(ctx, jpool, hostsApiList, p, host, eventParams)
-		logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
-		jpool.Drop(host.HostIp)
-		containers := getMachineContainers(ctx, hostsApiList, host)
-
-		containrs := []weka.HostId{
-			containers.Drive,
-			containers.Compute,
-			containers.Frontend,
-		}
-
-		removeFailure := false
-		readyForRemove := true
-		for _, hostId := range containrs {
-			if hostId.String() != "" {
-				container := allHostsMap[hostId]
-				if container.Status == "INACTIVE" {
-					err := removeContainer(ctx, jpool, hostId.Int(), p)
-					if err != nil {
-						removeFailure = true
-					}
-				} else {
-					readyForRemove = false
-				}
+	for hostIp, machineHosts := range inactiveMachines {
+		jpool.Drop(hostIp)
+		for _, host := range machineHosts {
+			if host.State != "INACTIVE" {
+				logger.Fatal().Msgf("Machine %s passed for removal has ACTIVE container: %s", host.HostIp, host.id)
 			}
-		}
+			logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
 
-		if removeFailure || !readyForRemove {
-			continue
-		}
+			removeFailure := false
+			readyForRemove := true
+			if host.Status == "INACTIVE" {
+				err := removeContainer(ctx, jpool, host.id.Int(), p)
+				if err != nil {
+					removeFailure = true
+				}
+			} else {
+				readyForRemove = false
+			}
 
-		instance := selectInstanceByIp(host.HostIp, instances)
-		if instance != nil {
-			p.ToTerminate = append(p.ToTerminate, *instance)
-		}
+			if removeFailure || !readyForRemove {
+				continue
+			}
 
-		for _, drive := range host.drives {
-			removeDrive(ctx, jpool, drive, p)
+			instance := selectInstanceByIp(host.HostIp, instances)
+			if instance != nil {
+				p.ToTerminate = append(p.ToTerminate, *instance)
+			}
+
+			for _, drive := range host.drives {
+				removeDrive(ctx, jpool, drive, p)
+			}
 		}
 	}
 
@@ -364,109 +329,127 @@ func removeDrive(ctx context.Context, jpool *jrpc.Pool, drive weka.Drive, p *pro
 	}
 }
 
-type machineContainers struct {
-	Compute  weka.HostId `json:"compute"`
-	Frontend weka.HostId `json:"frontend"`
-	Drive    weka.HostId `json:"drive"`
-}
-
-func getMachineContainers(ctx context.Context, hostsApiList weka.HostListResponse, inputHost hostInfo) (containers machineContainers) {
+func getMachineToHostMap(ctx context.Context, hosts hostsMap) map[string][]hostInfo {
 	logger := logging.LoggerFromCtx(ctx)
-	counter := 0
-	machineIdentifiers := make(map[string]types.Nilt)
-	for hostId, host := range hostsApiList {
-		if host.HostIp == inputHost.HostIp {
-			if host.Mode == "backend" {
-				counter++
-				machineIdentifiers[host.MachineIdentifier] = types.Nilv
-			}
-			if host.Mode == "backend" && strings2.Contains(host.ContainerName, "compute") {
-				containers.Compute = hostId
-			} else if host.Mode == "backend" && strings2.Contains(host.ContainerName, "frontend") {
-				containers.Frontend = hostId
-			} else if host.Mode == "backend" && strings2.Contains(host.ContainerName, "drive") {
-				containers.Drive = hostId
-			}
+	machineToHostMap := make(map[string][]hostInfo)
+
+	for _, host := range hosts {
+		if host.Mode == "backend" {
+			machineToHostMap[host.HostIp] = append(machineToHostMap[host.HostIp], host)
 		}
 	}
 
-	if counter > 3 {
-		logger.Fatal().Msgf("Found more than 3 backend containers for host %s", inputHost.HostIp)
-	}
-	if len(machineIdentifiers) > 1 {
-		logger.Fatal().Msgf("Found more than 1 machine identifier for host %s", inputHost.HostIp)
+	for hostIp, machineHosts := range machineToHostMap {
+		machineIdentifiers := make(map[string]types.Nilt)
+		if len(machineHosts) > 3 {
+			logger.Fatal().Msgf("Found more than 3 backend containers for host %s", hostIp)
+		}
+		for _, machineHost := range machineHosts {
+			machineIdentifiers[machineHost.MachineIdentifier] = types.Nilv
+		}
+		if len(machineIdentifiers) > 1 {
+			logger.Fatal().Msgf("Found more than 1 machine identifier for host %s", hostIp)
+		}
 	}
 
-	return
+	return machineToHostMap
 }
 
-func allContainersInactive(hostsApiList weka.HostListResponse, containers machineContainers) bool {
-	if containers.Drive.String() != "" && hostsApiList[containers.Drive].State != "INACTIVE" {
-		return false
-	}
-	if containers.Compute.String() != "" && hostsApiList[containers.Compute].State != "INACTIVE" {
-		return false
-	}
-	if containers.Frontend.String() != "" && hostsApiList[containers.Frontend].State != "INACTIVE" {
-		return false
+func allContainersInactive(hosts []hostInfo) bool {
+	for _, host := range hosts {
+		if host.State != "INACTIVE" {
+			return false
+		}
 	}
 	return true
 }
 
-func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.HostListResponse, response *protocol.ScaleResponse, host hostInfo, eventParams *deactivateEventInfo) {
+func allContainersDown(hosts []hostInfo) bool {
+	for _, host := range hosts {
+		if host.Status != "DOWN" {
+			return false
+		}
+	}
+	return true
+}
+
+func deactivate(ctx context.Context, jpool *jrpc.Pool, hostIp string, hostIds []weka.HostId, response *protocol.ScaleResponse) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Trying to deactivate machine %s...", host.HostIp)
-	for _, drive := range host.drives {
-		logger.Info().Msgf("Trying to deactivate drive: %s", drive.Uuid.String())
-		if drive.ShouldBeActive {
-			err1 := jpool.Call(weka.JrpcDeactivateDrives, types.JsonDict{
-				"drive_uuids": []uuid.UUID{drive.Uuid},
-			}, nil)
-			if err1 != nil {
-				logger.Error().Err(err1).Send()
-				response.AddTransientError(err1, "deactivateDrive")
+	err := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
+		"host_ids":                 hostIds,
+		"skip_resource_validation": false,
+	}, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		response.AddTransientError(err, "deactivateHost")
+	} else {
+		jpool.Drop(hostIp)
+	}
+	return
+}
+
+func deactivateMachine(ctx context.Context, jpool *jrpc.Pool, machineHosts []hostInfo, response *protocol.ScaleResponse, eventParams *deactivateEventInfo, nfsHostsMap map[weka.HostId]NfsHost) {
+	logger := logging.LoggerFromCtx(ctx)
+	var hostIds []weka.HostId
+
+	for _, host := range machineHosts {
+		hostIds = append(hostIds, host.id)
+		for _, drive := range host.drives {
+			logger.Info().Msgf("Trying to deactivate drive: %s", drive.Uuid.String())
+			if drive.ShouldBeActive {
+				err1 := jpool.Call(weka.JrpcDeactivateDrives, types.JsonDict{
+					"drive_uuids": []uuid.UUID{drive.Uuid},
+				}, nil)
+				if err1 != nil {
+					logger.Error().Err(err1).Send()
+					response.AddTransientError(err1, "deactivateDrive")
+				}
 			}
 		}
 	}
 
-	containers := getMachineContainers(ctx, hostsApiList, host)
-	logger.Info().Msgf(
-		"Trying to deactivate machine %s containers drive:%s compute:%s frontend:%s",
-		host.HostIp,
-		containers.Drive,
-		containers.Compute,
-		containers.Frontend,
-	)
+	logger.Info().Msgf("Trying to deactivate machine %s :%s", machineHosts[0].HostIp, hostIds)
+	machineTxt := "weka backend machine"
+	if len(nfsHostsMap) > 0 {
+		machineTxt = "nfs backend machine"
+		for _, host := range machineHosts {
+			if _, ok := nfsHostsMap[host.id]; !ok {
+				continue
+			}
+			err1 := jpool.Call(weka.JrpcinterfaceGroupDeletePort, types.JsonDict{
+				"name":    nfsHostsMap[host.id].InterfaceGroupName,
+				"host_id": nfsHostsMap[host.id].HostId.String(),
+				"port":    nfsHostsMap[host.id].Port,
+			}, nil)
+			if err1 != nil {
+				logger.Error().Err(err1).Send()
+				response.AddTransientError(err1, "interfaceGroupDeletePort")
+			}
+		}
+	}
+
 	// send weka event
+	if eventParams.reason == ScaleDownEvent {
+		message := fmt.Sprintf(
+			"Trying to deactivate Down %s %s",
+			machineTxt,
+			machineHosts[0].HostIp,
+		)
+
+		_ = weka_events.EmitCustomEventUsingJPool(ctx, message, jpool)
+	}
 	message := fmt.Sprintf(
-		"Trying to deactivate machine %s. Desired size: %d, current size: %d, reason: %s.",
-		host.HostIp,
+		"Trying to deactivate %s %s. Desired size: %d, current size: %d, reason: %s.",
+		machineTxt,
+		machineHosts[0].HostIp,
 		eventParams.desiredSize,
 		eventParams.currentSize,
 		eventParams.reason,
 	)
-	weka_events.EmitCustomEventUsingJPool(ctx, message, jpool)
 
-	var hostIds []weka.HostId
-	if containers.Drive.String() != "" {
-		hostIds = append(hostIds, containers.Drive)
-	}
-	if containers.Compute.String() != "" {
-		hostIds = append(hostIds, containers.Compute)
-	}
-	if containers.Frontend.String() != "" {
-		hostIds = append(hostIds, containers.Frontend)
-	}
-	err1 := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
-		"host_ids":                 hostIds,
-		"skip_resource_validation": false,
-	}, nil)
-	if err1 != nil {
-		logger.Error().Err(err1).Send()
-		response.AddTransientError(err1, "deactivateHost")
-	} else {
-		jpool.Drop(host.HostIp)
-	}
+	_ = weka_events.EmitCustomEventUsingJPool(ctx, message, jpool)
+
+	deactivate(ctx, jpool, machineHosts[0].HostIp, hostIds, response)
 
 }
 
@@ -480,30 +463,72 @@ func isMBC(hostsApiList weka.HostListResponse) bool {
 }
 
 type hostsMap map[weka.HostId]hostInfo
+type HostGroupType string
+
+type NfsHost struct {
+	InterfaceGroupName string
+	HostId             weka.HostId
+	Port               string
+}
+
+func GetNfsHostsMap(ctx context.Context, jpool *jrpc.Pool) (nfsHostsMap map[weka.HostId]NfsHost, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	nfsHostsMap = make(map[weka.HostId]NfsHost)
+	interfaceGroupList := weka.InterfaceGroupListResponse{}
+	err = jpool.Call(weka.JrpcInterfaceGroupList, struct{}{}, &interfaceGroupList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	for _, interfaceGroup := range interfaceGroupList {
+		if interfaceGroup.Type == "NFS" {
+			for _, portHost := range interfaceGroup.Ports {
+				logger.Debug().Msgf("Found NFS port host %s", portHost.HostId)
+				nfsHostsMap[portHost.HostId] = NfsHost{
+					InterfaceGroupName: interfaceGroup.Name,
+					HostId:             portHost.HostId,
+					Port:               portHost.Port,
+				}
+			}
+		}
+	}
+
+	return
+}
+
+func getHostGroupHosts(hosts map[weka.HostId]hostInfo, instances []protocol.HgInstance) map[weka.HostId]hostInfo {
+	hgHosts := make(map[weka.HostId]hostInfo)
+	for hostId, host := range hosts {
+		if host.belongsToHgIpBased(instances) {
+			hgHosts[hostId] = host
+		}
+	}
+	return hgHosts
+}
+
+func getLeftoverHosts(hosts map[weka.HostId]hostInfo, instances []protocol.HgInstance) map[weka.HostId]hostInfo {
+	hgHosts := make(map[weka.HostId]hostInfo)
+	for hostId, host := range hosts {
+		if !host.belongsToHgIpBased(instances) {
+			hgHosts[hostId] = host
+		}
+	}
+	return hgHosts
+}
 
 func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
-	/*
-		Code in here based on following logic:
-
-		A - Fully active, healthy
-		T - Desired target number
-		U - Unhealthy, we want to remove it for whatever reason. DOWN host, FAILED drive, so on
-		D - Drives/hosts being deactivated
-		NEW_D - Decision to start deactivating, i.e transition to D, basing on U. Never more then 2 for U
-
-		NEW_D = func(A, U, T, D)
-
-		NEW_D = max(A+U+D-T, min(2-D, U), 0)
-	*/
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Running scale down...")
 	response.Version = protocol.Version
+
+	if info.Role != "backend" {
+		logger.Info().Msg("Skipping scale down, not a backend")
+	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, info.Username, info.Password)
 	}
 	ips := info.BackendIps
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
 	jpool := &jrpc.Pool{
 		Ips:     ips,
@@ -517,6 +542,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	hostsApiList := weka.HostListResponse{}
 	driveApiList := weka.DriveListResponse{}
 	nodeApiList := weka.NodeListResponse{}
+	interfaceGroupList := weka.InterfaceGroupListResponse{}
 
 	err = jpool.Call(weka.JrpcStatus, struct{}{}, &systemStatus)
 	if err != nil {
@@ -540,14 +566,19 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return
 	}
 
-	if info.Role == "backend" {
-		err = jpool.Call(weka.JrpcDrivesList, struct{}{}, &driveApiList)
-		if err != nil {
-			logger.Error().Err(err).Send()
-			return
-		}
+	err = jpool.Call(weka.JrpcDrivesList, struct{}{}, &driveApiList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
 	}
+
 	err = jpool.Call(weka.JrpcNodeList, struct{}{}, &nodeApiList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	err = jpool.Call(weka.JrpcInterfaceGroupList, struct{}{}, &interfaceGroupList)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
@@ -574,10 +605,72 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		}
 	}
 
-	var hostsList []hostInfo
-	var inactiveHosts []hostInfo
-	var downHosts []hostInfo
+	removeOldDrives(ctx, driveApiList, jpool, &response)
 
+	var errs []error
+	hgHosts := getHostGroupHosts(hosts, info.WekaBackendInstances)
+	logger.Info().Msg("Running scale down on weka backends...")
+	err = ScaleHgDown(ctx, jpool, info.WekaBackendInstances, hgHosts, info.WekaBackendsDesiredCapacity, &response, nil)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	nfsHostsMap, err := GetNfsHostsMap(ctx, jpool)
+	if err != nil {
+		response.AddTransientError(err, "GetNfsHostsMap")
+	} else {
+		logger.Info().Msg("Running scale down on NFS hosts...")
+		hgHosts = getHostGroupHosts(hosts, info.NfsBackendInstances)
+		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, hgHosts, info.NFSBackendsDesiredCapacity, &response, nfsHostsMap)
+		if err2 != nil {
+			errs = append(errs, err2)
+		}
+	}
+
+	instances := info.WekaBackendInstances
+	instances = append(instances, info.NfsBackendInstances...)
+	hgHosts = getLeftoverHosts(hosts, instances)
+	handleLeftOverHosts(ctx, jpool, instances, hgHosts, -1, &response, nfsHostsMap)
+
+	validateDelta(ctx, &response, jpool, instances)
+
+	if len(errs) > 0 {
+		err = fmt.Errorf("scale down failed: %v", errs)
+	}
+
+	return
+}
+
+func getHostIdsString(hosts hostsMap) (hostIds string) {
+	for hostId := range hosts {
+		hostIds += hostId.String() + " "
+	}
+	return
+}
+
+func ScaleHgDown(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, hosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost) (err error) {
+	/*
+		Code in here based on following logic:
+
+		A - Fully active, healthy
+		T - Desired target number
+		U - Unhealthy, we want to remove it for whatever reason. DOWN host, FAILED drive, so on
+		D - Drives/hosts being deactivated
+		NEW_D - Decision to start deactivating, i.e transition to D, basing on U. Never more than 2 for U
+
+		NEW_D = func(A, U, T, D)
+
+		NEW_D = max(A+U+D-T, min(2-D, U), 0)
+	*/
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Running HG scale down (%s)", getHostIdsString(hosts))
+
+	var hostsList []hostInfo
+	var machinesIps []string
+	machinesIpsMap := make(map[string]types.Nilt)
+
+	machineToHostMap := getMachineToHostMap(ctx, hosts) // protocol gws + weka backends
+	inactiveMachines := make(map[string][]hostInfo)
 	inactiveOrDownHostsIps := make(map[string]types.Nilt)
 	for _, host := range hosts {
 		if host.Mode == "client" {
@@ -591,44 +684,17 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 		switch host.State {
 		case "INACTIVE":
-			containers := getMachineContainers(ctx, hostsApiList, host)
-			if host.belongsToHgIpBased(info.Instances) {
-				if allContainersInactive(hostsApiList, containers) {
-					logger.Info().Msgf("Inactive machine found: %s", host.HostIp)
-					inactiveHosts = append(inactiveHosts, hosts[containers.Drive])
-					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
-				} else {
-					hostsList = append(hostsList, host)
-				}
-				continue
+			if allContainersInactive(machineToHostMap[host.HostIp]) {
+				logger.Info().Msgf("Inactive machine found: %s", host.HostIp)
+				inactiveMachines[host.HostIp] = machineToHostMap[host.HostIp]
+				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 			} else {
-				if info.Role == "backend" {
-					logger.Info().Msgf("host %s is inactive and does not belong to HG, removing from cluster", host.id)
-					inactiveHosts = append(inactiveHosts, hosts[containers.Drive])
-					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
-					continue
-				}
-			}
-		default:
-			if host.belongsToHgIpBased(info.Instances) {
 				hostsList = append(hostsList, host)
-				continue
 			}
-		}
 
-		switch host.Status {
-		case "DOWN":
-			logger.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
-			if info.Role == "backend" {
-				if host.State != "INACTIVE" && host.managementTimedOut(downKickOutTimeout) {
-					logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
-					downHosts = append(downHosts, hosts[getMachineContainers(ctx, hostsApiList, host).Drive])
-					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
-					continue
-				}
-			}
+		default:
+			hostsList = append(hostsList, host)
 		}
-
 	}
 
 	calculateHostsState(ctx, hostsList)
@@ -654,34 +720,27 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return a.AddedTime.Before(b.AddedTime)
 	})
 
-	removeOldDrives(ctx, driveApiList, jpool, &response)
-
-	driveContainers, err := getDriveContainers(hostsList)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
+	for _, host := range hostsList {
+		if _, ok := machinesIpsMap[host.HostIp]; !ok {
+			machinesIpsMap[host.HostIp] = types.Nilv
+			machinesIps = append(machinesIps, host.HostIp)
+		}
 	}
-	machinesNumber := len(driveContainers)
-	logger.Info().Msgf("Machines number:%d, Desired number:%d", machinesNumber, info.DesiredCapacity)
+	backendMachinesNumber := len(machineToHostMap)
+	logger.Info().Msgf("Backend machines number:%d Desired capacity:%d", backendMachinesNumber, desiredCapacity)
 
 	eventParams := deactivateEventInfo{
-		currentSize: machinesNumber,
-		desiredSize: info.DesiredCapacity,
-		reason:      "inactive host",
+		currentSize: backendMachinesNumber,
+		desiredSize: desiredCapacity,
+		reason:      "inactive machine",
 	}
 
-	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response, hosts, &eventParams)
+	removeInactive(ctx, inactiveMachines, jpool, instances, response)
 
-	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)
-
-	for _, host := range driveContainers[:numToDeactivate] {
-		eventParams.reason = "scale down"
-		deactivateHost(ctx, jpool, hostsApiList, &response, host, &eventParams)
-	}
-
-	for _, host := range downHosts {
-		eventParams.reason = "down host"
-		deactivateHost(ctx, jpool, hostsApiList, &response, host, &eventParams)
+	numToDeactivate := getNumToDeactivate(ctx, hostsList, desiredCapacity)
+	for _, hostIp := range machinesIps[:numToDeactivate] {
+		eventParams.reason = ScaleDownEvent
+		deactivateMachine(ctx, jpool, machineToHostMap[hostIp], response, &eventParams, nfsHostsMap)
 	}
 
 	for _, host := range hostsList {
@@ -694,11 +753,10 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		})
 	}
 
-	validateDelta(ctx, response, jpool, info)
 	return
 }
 
-func validateDelta(ctx context.Context, response protocol.ScaleResponse, jpool *jrpc.Pool, info protocol.HostGroupInfoResponse) {
+func validateDelta(ctx context.Context, response *protocol.ScaleResponse, jpool *jrpc.Pool, instances []protocol.HgInstance) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Validating delta")
 
@@ -722,7 +780,7 @@ func validateDelta(ctx context.Context, response protocol.ScaleResponse, jpool *
 		responseContainerIps[host.PrivateIp] = types.Nilv
 	}
 
-	for _, instance := range info.Instances {
+	for _, instance := range instances {
 		cloudIps[instance.PrivateIp] = types.Nilv
 	}
 
@@ -740,24 +798,68 @@ CloudIps:
 		}
 	}
 
-	deltaIps := []string{}
+	var deltaIps []string
 	for ip := range deltaMap {
 		deltaIps = append(deltaIps, ip)
 	}
 
 	logger.Info().Msgf("delta ips for termination: %v", deltaIps)
 
-	for terminatingIp, _ := range deltaMap {
+	for terminatingIp := range deltaMap {
 		for hostId, host := range hostsApiList {
 			if host.HostIp == terminatingIp && host.State != "INACTIVE" && host.State != "REMOVING" {
 				if host.Status == "DOWN" && host.Mode == "client" && host.AutoRemoveTimeout > 0 {
 					logger.Warn().Msgf("Detected IP collision between client and backend with ip %s, ignoring as client is down ", host.HostIp)
 					continue
 				}
-				hostInfo := fmt.Sprintf("%s:%s:%s:%s:%s", host.Mode, hostId, host.ContainerName, host.Status, host.State)
-				logger.Fatal().Msgf("Aborting scale down. Instance with IP that exists in system and belongs to non-inactive container %s was targeted for termination: %s", hostInfo, host.HostIp)
+				hostDetails := fmt.Sprintf("%s:%s:%s:%s:%s", host.Mode, hostId, host.ContainerName, host.Status, host.State)
+				logger.Fatal().Msgf("Aborting scale down. Instance with IP that exists in system and belongs to non-inactive container %s was targeted for termination: %s", hostDetails, host.HostIp)
 			}
 		}
 	}
+}
 
+func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, hosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Handling leftover hosts (%s)", getHostIdsString(hosts))
+
+	var downMachines []string
+	inactiveMachines := make(map[string][]hostInfo)
+	inactiveOrDownHostsIps := make(map[string]types.Nilt)
+	machineToHostMap := getMachineToHostMap(ctx, hosts)
+	for _, host := range hosts {
+		if host.Mode == "client" {
+			continue
+		}
+		if host.State == "INACTIVE" {
+			logger.Info().Msgf("host %s is inactive and does not belong to HG", host.id)
+			if allContainersInactive(machineToHostMap[host.HostIp]) {
+				inactiveMachines[host.HostIp] = machineToHostMap[host.HostIp]
+			}
+			inactiveOrDownHostsIps[host.HostIp] = types.Nilv
+		} else if host.Status == "DOWN" {
+			logger.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
+			if !allContainersDown(machineToHostMap[host.HostIp]) {
+				logger.Fatal().Msgf("host %s is down but not all containers on the machine are down", host.id)
+			}
+			if host.managementTimedOut(downKickOutTimeout) {
+				logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
+				downMachines = append(downMachines, host.HostIp)
+				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
+			}
+		} else {
+			logger.Fatal().Msgf("host %s is active and does not belong to HG", host.id)
+		}
+	}
+	removeInactive(ctx, inactiveMachines, jpool, instances, response)
+	eventParams := deactivateEventInfo{
+		currentSize: desiredCapacity,
+		desiredSize: desiredCapacity,
+		reason:      InactiveMachineEvent,
+	}
+
+	for _, hostIp := range downMachines {
+		eventParams.reason = DownMachineEvent
+		deactivateMachine(ctx, jpool, machineToHostMap[hostIp], response, &eventParams, nfsHostsMap)
+	}
 }

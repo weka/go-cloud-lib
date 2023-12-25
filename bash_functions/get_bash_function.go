@@ -6,7 +6,6 @@ import (
 
 func GetCoreIds() string {
 	s := `
-	set -ex
 	numa_ranges=()
 	numa=()
 
@@ -120,5 +119,46 @@ func GetWekaPartitionScript() string {
 		mount "$wekaiosw_device" /opt/weka || return 1
 		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 	fi`
+	return dedent.Dedent(s)
+}
+
+func WekaRestFunction() string {
+	s := `
+	function weka_rest() {
+		# requires WEKA_USERNAME, WEKA_PASSWORD and backend_ip to be set
+		endpoint="$1"
+		data="$2"
+		access_token=$(curl -X POST "http://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}" | jq -r '.data.access_token')
+		if [ -z "$data" ]; then
+			curl "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" || (echo "weka rest api get request failed: $endpoint" && return 1)
+		else
+			curl -X POST "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data"  || (echo "weka rest api post request failed: $endpoint $data" && return 1)
+		fi
+	}
+	`
+	return dedent.Dedent(s)
+}
+
+func SetBackendIpFunction() string {
+	s := `
+	function set_backend_ip() {
+		# requires ips_str. requires LOAD_BALANCER_IP if exists
+		if [ -z "$LOAD_BALANCER_IP" ]
+		then
+			random=$$
+			echo $random
+			ips_array=${ips_str//,/ }
+			for backend_ip in ${ips_array[@]}; do
+				if VERSION=$(curl -s -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' $backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
+					if [[ "$VERSION" != "" ]]; then
+						break
+					fi
+				fi
+			done
+		else
+			backend_ip="$LOAD_BALANCER_IP"
+		fi
+	}
+	`
 	return dedent.Dedent(s)
 }

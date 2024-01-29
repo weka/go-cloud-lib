@@ -128,12 +128,14 @@ func WekaRestFunction() string {
 		# requires WEKA_USERNAME, WEKA_PASSWORD and backend_ip to be set
 		endpoint="$1"
 		data="$2"
+		set +x
 		access_token=$(curl -X POST "http://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}" | jq -r '.data.access_token')
 		if [ -z "$data" ]; then
 			curl "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" || (echo "weka rest api get request failed: $endpoint" && return 1)
 		else
 			curl -X POST "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data"  || (echo "weka rest api post request failed: $endpoint $data" && return 1)
 		fi
+		set -x
 	}
 	`
 	return dedent.Dedent(s)

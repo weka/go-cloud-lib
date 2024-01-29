@@ -113,3 +113,7 @@ type Vm struct {
 	ContainerUid string     `json:"container_uid"` // protocol frontend container uid
 	NicName      string     `json:"nic_name"`      // protocol management nic name
 }
+
+type FetchRequest struct {
+	FetchWekaCredentials bool `json:"fetch_weka_credentials"`
+}

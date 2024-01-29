@@ -23,9 +23,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	template := `
 	#!/bin/bash
-	set -ex
-	export WEKA_USERNAME="%s"
-	export WEKA_PASSWORD="%s"
 	VM=%s
 	FRONTEND_CONTAINER_CORES_NUM=%d
 	NICS_NUM=%s
@@ -63,6 +60,12 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set_backend_ip bash function definition
 	%s
 
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	set -x
+
 	weka local stop
 	weka local rm default --force
 
@@ -74,7 +77,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	do
 		sleep 10
 		clusterized=$(status "{\"type\": \"status\"}" | jq .clusterized)
-		echo "Clusterized: $clusterized"
+		echo "Clusterized: $clusterized, going to sleep for 10 seconds"
 	done
 
 	ips_str=$(fetch | jq -r '.backend_ips | join(",")')
@@ -95,7 +98,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	done
 
 	protect "{\"vm\": \"$VM\"}"
+	set +x
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+	set -x
 	weka local ps
 
 	set_backend_ip
@@ -122,8 +127,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	`
 	script := fmt.Sprintf(
 		template,
-		d.Params.WekaUsername,
-		d.Params.WekaPassword,
 		d.Params.VMName,
 		d.Params.NFSProtocolGatewayFeCoresNum,
 		d.Params.NicsNum,

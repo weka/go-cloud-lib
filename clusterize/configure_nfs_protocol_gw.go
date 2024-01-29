@@ -21,9 +21,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	configureNFSScriptTemplate := `
 	#!/bin/bash
 	set -ex
-	export WEKA_USERNAME="%s"
-	export WEKA_PASSWORD="%s"
-	
+
 	interface_group_name="%s"
 	client_group_name="%s"
 	containersUid=(%s)
@@ -46,7 +44,13 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# set_backend_ip bash function definition
 	%s
 
-	ips_str=$(fetch | jq -r '.backend_ips | join(",")')
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	ips_str=$(echo $fetch_result | jq -r '.backend_ips | join(",")')
+	set -x
+
 	set_backend_ip
 
 	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
@@ -159,8 +163,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	`
 	nfsSetupScript := fmt.Sprintf(
 		configureNFSScriptTemplate,
-		c.WekaUsername,
-		c.WekaPassword,
 		c.Params.InterfaceGroupName,
 		c.Params.ClientGroupName,
 		strings.Join(c.Params.ContainersUid, " "),

@@ -45,6 +45,7 @@ type ClusterizeScriptGenerator struct {
 func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	reportFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	clusterizeFinFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization)
+	fetchFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	params := c.Params
 
 	clusterizeScriptTemplate := `
@@ -60,17 +61,24 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	STRIPE_WIDTH=%d
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
-	WEKA_USERNAME="%s"
-	WEKA_PASSWORD="%s"
 	INSTALL_DPDK=%t
 	ADD_FRONTEND=%t
 	PROXY_URL="%s"
 	WEKA_HOME_URL="%s"
 
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
+
+	# fetch function definition
+	%s
+
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
+	set -x
 	devices=($devices)
 
 	CONTAINER_NAMES=(drives0 compute0)
@@ -105,8 +113,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running Clusterization\"}"
 
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
+
+	set +x
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+	set -x
 	
 	# post cluster creation script
 	function post_cluster_creation() {
@@ -234,10 +245,28 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	fi
 	`
 	script := fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.ClusterizationTarget, params.NvmesNum,
-		params.SetObs, params.SmbwEnabled, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
-		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.ProxyUrl, params.WekaHomeUrl, params.FindDrivesScript,
-		reportFuncDef, clusterizeFinFuncDef, params.PostClusterCreationScript, params.PreStartIoScript, params.ObsScript,
+		dedent.Dedent(clusterizeScriptTemplate),
+		strings.Join(params.VMNames, " "),
+		strings.Join(params.IPs, " "),
+		params.ClusterName,
+		params.ClusterizationTarget,
+		params.NvmesNum,
+		params.SetObs,
+		params.SmbwEnabled,
+		params.DataProtection.StripeWidth,
+		params.DataProtection.ProtectionLevel,
+		params.DataProtection.Hotspare,
+		params.InstallDpdk,
+		params.AddFrontend,
+		params.ProxyUrl,
+		params.WekaHomeUrl,
+		params.FindDrivesScript,
+		fetchFuncDef,
+		reportFuncDef,
+		clusterizeFinFuncDef,
+		params.PostClusterCreationScript,
+		params.PreStartIoScript,
+		params.ObsScript,
 	)
 	return script
 }

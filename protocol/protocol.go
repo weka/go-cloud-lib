@@ -14,15 +14,16 @@ type HgInstance struct {
 }
 
 type HostGroupInfoResponse struct {
-	Username                    string       `json:"username"`
-	Password                    string       `json:"password"`
-	WekaBackendsDesiredCapacity int          `json:"weka_backends_desired_capacity"`
-	NFSBackendsDesiredCapacity  int          `json:"nfs_backends_desired_capacity"`
-	WekaBackendInstances        []HgInstance `json:"weka_backend_instances"`
-	NfsBackendInstances         []HgInstance `json:"nfs_backend_instances"`
-	BackendIps                  []string     `json:"backend_ips"`
-	Role                        string       `json:"role"`
-	Version                     int          `json:"version"`
+	Username                    string        `json:"username"`
+	Password                    string        `json:"password"`
+	WekaBackendsDesiredCapacity int           `json:"weka_backends_desired_capacity"`
+	NFSBackendsDesiredCapacity  int           `json:"nfs_backends_desired_capacity"`
+	WekaBackendInstances        []HgInstance  `json:"weka_backend_instances"`
+	NfsBackendInstances         []HgInstance  `json:"nfs_backend_instances"`
+	DownBackendsRemovalTimeout  time.Duration `json:"down_backends_removal_timeout"`
+	BackendIps                  []string      `json:"backend_ips"`
+	Role                        string        `json:"role"`
+	Version                     int           `json:"version"`
 }
 
 type ScaleResponseHost struct {

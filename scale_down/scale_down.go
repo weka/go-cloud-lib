@@ -25,7 +25,6 @@ import (
 type hostState int
 
 const unhealthyDeactivateTimeout = 120 * time.Minute
-const downKickOutTimeout = 3 * time.Hour
 
 func (h hostState) String() string {
 	switch h {
@@ -121,7 +120,8 @@ func (host hostInfo) allDrivesInactive() bool {
 	return true
 }
 
-func (host hostInfo) managementTimedOut(timeout time.Duration) bool {
+func (host hostInfo) managementTimedOut(ctx context.Context, timeout time.Duration) bool {
+	logger := logging.LoggerFromCtx(ctx)
 	for nodeId, node := range host.nodes {
 		if !nodeId.IsManagement() {
 			continue
@@ -132,6 +132,7 @@ func (host hostInfo) managementTimedOut(timeout time.Duration) bool {
 		} else {
 			period = host.StateChangedTime
 		}
+		logger.Info().Msgf("Node %s status: %s, period: %s, timeout: %s", nodeId.String(), node.Status, time.Since(period), timeout)
 		if node.Status == "DOWN" && time.Since(period) > timeout {
 			return true
 		}
@@ -229,7 +230,7 @@ func deriveHostState(ctx context.Context, host *hostInfo) hostState {
 	if strings.AnyOf(host.State, "DEACTIVATING", "REMOVING", "INACTIVE") {
 		return DEACTIVATING
 	}
-	if strings.AnyOf(host.Status, "DOWN", "DEGRADED") && host.managementTimedOut(unhealthyDeactivateTimeout) {
+	if strings.AnyOf(host.Status, "DOWN", "DEGRADED") && host.managementTimedOut(ctx, unhealthyDeactivateTimeout) {
 		logger.Info().Msgf("Marking %s as unhealthy due to DOWN", host.id.String())
 		return UNHEALTHY
 	}
@@ -630,7 +631,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	instances := info.WekaBackendInstances
 	instances = append(instances, info.NfsBackendInstances...)
 	hgHosts = getLeftoverHosts(hosts, instances)
-	handleLeftOverHosts(ctx, jpool, instances, hgHosts, -1, &response, nfsHostsMap)
+	handleLeftOverHosts(ctx, jpool, instances, hgHosts, -1, &response, nfsHostsMap, info.DownBackendsRemovalTimeout)
 
 	validateDelta(ctx, &response, jpool, instances)
 
@@ -819,7 +820,7 @@ CloudIps:
 	}
 }
 
-func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, hosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost) {
+func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, hosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost, downKickOutTimeout time.Duration) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Handling leftover hosts (%s)", getHostIdsString(hosts))
 
@@ -842,7 +843,7 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 			if !allContainersDown(machineToHostMap[host.HostIp]) {
 				logger.Fatal().Msgf("host %s is down but not all containers on the machine are down", host.id)
 			}
-			if host.managementTimedOut(downKickOutTimeout) {
+			if host.managementTimedOut(ctx, downKickOutTimeout) {
 				logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
 				downMachines = append(downMachines, host.HostIp)
 				inactiveOrDownHostsIps[host.HostIp] = types.Nilv

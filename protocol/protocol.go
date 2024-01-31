@@ -87,3 +87,7 @@ type ClusterCreds struct {
 	Username string
 	Password string
 }
+
+type FetchRequest struct {
+	FetchWekaCredentials bool `json:"fetch_weka_credentials"`
+}

@@ -34,20 +34,19 @@ type JoinScriptGenerator struct {
 }
 
 func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
+	fetchFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
 	gateways := strings.Join(j.Params.Gateways, " ")
+	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
 	ips := j.Params.IPs
 	common.ShuffleSlice(ips)
 
 	bashScriptTemplate := `
-	export WEKA_USERNAME="%s"
-	export WEKA_PASSWORD="%s"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	IPS=(%s)
 	HASHED_IP=$(%s)
 	COMPUTE=%d
@@ -58,6 +57,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	GATEWAYS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 	PROXY_URL="%s"
+
+	# fetch function definition
+	%s
 
 	# report function definition
 	%s
@@ -70,6 +72,14 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	# getNetStrForDpdk bash function definitiion
 	%s
+
+
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	set -x
 
 	# deviceNameCmd
 	wekaiosw_device="%s"
@@ -145,9 +155,23 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
-		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
-		compute, frontend, drive, mem, j.Params.InstallDpdk, gateways, j.Params.ProxyUrl, reportFunc,
-		joinFinalizationFunc, getCoreIdsFunc, getNetStrForDpdkFunc, j.DeviceNameCmd, bash_functions.GetWekaPartitionScript(),
+		bashScriptTemplate,
+		strings.Join(ips, " "),
+		failureDomainCmd,
+		compute,
+		frontend,
+		drive,
+		mem,
+		j.Params.InstallDpdk,
+		gateways,
+		j.Params.ProxyUrl,
+		fetchFunc,
+		reportFunc,
+		joinFinalizationFunc,
+		getCoreIdsFunc,
+		getNetStrForDpdkFunc,
+		j.DeviceNameCmd,
+		bash_functions.GetWekaPartitionScript(),
 	)
 	return dedent.Dedent(bashScript)
 }
@@ -167,12 +191,14 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	s := `
 	compute_name=$(%s)
 
-	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
 
 	# write down find_drives script (another string input for this template)
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
+	set +x
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
+	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
+	set -x
 	for device in $devices; do
 		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
 	done

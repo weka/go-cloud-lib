@@ -8,6 +8,7 @@ const (
 	Deploy                  FunctionName = "deploy"
 	Protect                 FunctionName = "protect"
 	Report                  FunctionName = "report"
+	Fetch                   FunctionName = "fetch"
 	Join                    FunctionName = "join"
 	JoinFinalization        FunctionName = "join_finalization"
 )

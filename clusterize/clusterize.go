@@ -113,8 +113,9 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	
 	sleep 30s
 
-	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives\"}"
 
+	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
 	for drive_num in "${DRIVE_NUMS[@]}"; do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
 			while true; do
@@ -143,6 +144,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	fi
 	weka cluster hot-spare $HOTSPARE
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running start-io\"}"
 	weka cluster start-io
 	
 	sleep 15s

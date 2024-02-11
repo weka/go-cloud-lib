@@ -117,16 +117,53 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
 	for drive_num in "${DRIVE_NUMS[@]}"; do
+		bad_drives=false
 		for (( d=0; d<$NVMES_NUM; d++ )); do
 			while true; do
 				if lsblk "${devices[$d]}" >/dev/null 2>&1 ;then
-					weka cluster drive add $drive_num "${devices[$d]}"
+					if ! weka cluster drive add $drive_num "${devices[$d]}"; then
+						report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drive: $drive_num ${devices[$d]}\"}"
+						bad_drives=true
+					fi
 					break
 				fi
 				echo "waiting for nvme to be ready"
 				sleep 5
 			done
 		done
+
+		if [ $bad_drives = true ]; then
+			weka_hostname=$(weka cluster container -c $drive_num | tail -n +2 | awk '{print $2}')
+			containers=($(weka cluster container | grep $weka_hostname | awk '{print $1}'))
+			for c in "${containers[@]}"
+			do
+				report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"
+				weka cluster container deactivate $c || true
+			done
+
+			all_inactive=false
+			while [ $all_inactive = false ] ; do
+				all_inactive=true
+				for c in "${containers[@]}"
+				do
+					status=$(weka cluster container -c $c | tail -n +2 | awk '{print $5}')
+					if [ "$status" != "INACTIVE" ]; then
+						echo "Container $c status:$status"
+						all_inactive=false
+						sleep 5
+						break
+					fi
+				done
+			done
+
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Removing drives: $drive_num\"}"
+			drives=($(weka cluster drive | grep $weka_hostname | awk '{print $2}'))
+			for d in "${drives[@]}"
+			do
+				weka cluster drive remove $d -f || true
+			done
+		fi
+
 	done
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
@@ -153,7 +190,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster drive
 	weka cluster container
 	
-	weka fs group create default
+	weka fs group create default || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
 	# for SMBW setup we need to create a separate fs with 10GB capacity
 	if [[ $SMBW_ENABLED == true ]]; then
 	    weka fs create .config_fs default 10GB

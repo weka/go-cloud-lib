@@ -16,24 +16,25 @@ type DataProtectionParams struct {
 }
 
 type ClusterParams struct {
-	VMNames           []string
-	IPs               []string
-	ClusterName       string
-	Prefix            string
-	HostsNum          int
-	NvmesNum          int
-	WekaUsername      string
-	WekaPassword      string
-	SetObs            bool
-	SmbwEnabled       bool
-	ObsScript         string
-	DataProtection    DataProtectionParams
-	InstallDpdk       bool
-	DebugOverrideCmds string
-	AddFrontend       bool
-	FindDrivesScript  string
-	ProxyUrl          string
-	WekaHomeUrl       string
+	VMNames                   []string
+	IPs                       []string
+	ClusterName               string
+	Prefix                    string
+	ClusterizationTarget      int
+	NvmesNum                  int
+	WekaUsername              string
+	WekaPassword              string
+	SetObs                    bool
+	SmbwEnabled               bool
+	ObsScript                 string
+	DataProtection            DataProtectionParams
+	InstallDpdk               bool
+	AddFrontend               bool
+	FindDrivesScript          string
+	ProxyUrl                  string
+	WekaHomeUrl               string
+	PreStartIoScript          string
+	PostClusterCreationScript string
 }
 
 type ClusterizeScriptGenerator struct {
@@ -82,7 +83,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	%s
 
 	last_vm_name=${VMS[${#VMS[@]} - 1]}
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"This ($last_vm_name) is instance $HOSTS_NUM/$HOSTS_NUM that is ready for clusterization\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"This ($last_vm_name) is instance $HOSTS_NUM that is ready for clusterization\"}"
 
 	if [[ $ADD_FRONTEND == true ]]; then
 		CONTAINER_NAMES+=(frontend0)
@@ -107,9 +108,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
 	
-	if [[ $INSTALL_DPDK == true ]]; then
+	# post cluster creation script
+	function post_cluster_creation() {
+		echo "running post cluster creation script"
 		%s
-	fi
+	}
+	post_cluster_creation || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed running post cluster create script\"}"
 	
 	sleep 30s
 
@@ -181,6 +185,14 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	fi
 	weka cluster hot-spare $HOTSPARE
+
+	# pre start-io script
+	function pre_start_io() {
+		echo "running pre start-io script"
+		%s
+	}
+	pre_start_io || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed running pre start-io script\"}"
+
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running start-io\"}"
 	weka cluster start-io
 	
@@ -222,10 +234,10 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	fi
 	`
 	script := fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.HostsNum, params.NvmesNum,
+		dedent.Dedent(clusterizeScriptTemplate), strings.Join(params.VMNames, " "), strings.Join(params.IPs, " "), params.ClusterName, params.ClusterizationTarget, params.NvmesNum,
 		params.SetObs, params.SmbwEnabled, params.DataProtection.StripeWidth, params.DataProtection.ProtectionLevel, params.DataProtection.Hotspare,
 		params.WekaUsername, params.WekaPassword, params.InstallDpdk, params.AddFrontend, params.ProxyUrl, params.WekaHomeUrl, params.FindDrivesScript,
-		reportFuncDef, clusterizeFinFuncDef, params.DebugOverrideCmds, params.ObsScript,
+		reportFuncDef, clusterizeFinFuncDef, params.PostClusterCreationScript, params.PreStartIoScript, params.ObsScript,
 	)
 	return script
 }

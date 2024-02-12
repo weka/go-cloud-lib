@@ -152,6 +152,69 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	return dedent.Dedent(bashScript)
 }
 
+func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Context) string {
+	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
+	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
+	statusFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Status)
+
+	ips := j.Params.IPs
+	common.ShuffleSlice(ips)
+
+	bashScriptTemplate := `
+	set -ex
+
+	export WEKA_USERNAME="%s"
+	export WEKA_PASSWORD="%s"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	host_ips="%s"
+	
+	# report function definition
+	%s
+
+	# join_finalization function definition
+	%s
+	
+	# status function definition
+	%s
+	
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining instance (Initial setup)\"}"
+
+	clusterized=$(status | jq .clusterized)
+	while [ $clusterized != true ]; do
+		echo "Waiting for clusterization to complete"
+		sleep 5
+		clusterized=$(status | jq .clusterized)
+	done
+
+	mgmt_ip=$(hostname -I | awk '{print $1}')
+
+	sudo weka local resources management-ips $mgmt_ip -C drives0
+	weka local resources join-ips --container drives0 $host_ips
+	weka local resources apply -f --container drives0
+
+	sudo weka local resources management-ips $mgmt_ip -C compute0
+	weka local resources join-ips --container compute0 $host_ips
+	weka local resources apply -f --container compute0
+
+	if [[ $FRONTEND -gt 0 ]]; then
+		sudo weka local resources management-ips $mgmt_ip -C frontend0
+		weka local resources join-ips --container frontend0 $host_ips
+		weka local resources apply -f --container frontend0
+	fi
+	`
+
+	isReady := j.getIsReadyScript()
+	addDrives := j.getAddDrivesScript()
+
+	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
+	bashScriptTemplate += isReady + addDrives
+	bashScript := fmt.Sprintf(
+		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), reportFunc,
+		joinFinalizationFunc, statusFunc,
+	)
+	return dedent.Dedent(bashScript)
+}
+
 func (j *JoinScriptGenerator) getIsReadyScript() string {
 	s := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do

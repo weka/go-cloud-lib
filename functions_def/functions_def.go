@@ -10,6 +10,7 @@ const (
 	Report                  FunctionName = "report"
 	Join                    FunctionName = "join"
 	JoinFinalization        FunctionName = "join_finalization"
+	Status                  FunctionName = "status"
 )
 
 type FunctionDef interface {

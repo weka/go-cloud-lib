@@ -10,21 +10,21 @@ type ClusterizationStatusSummary struct {
 	Stopped                int      `json:"stopped"`
 	InProgress             int      `json:"in_progress"`
 	Unknown                []string `json:"unknown"`
+	ClusterizationTarget   int      `json:"clusterization_target"`
 	ClusterizationInstance string   `json:"clusterization_instance"`
 	Clusterized            bool     `json:"clusterized"`
 }
 
 // ClusterState is maintained in object store
 type ClusterState struct {
-	InitialSize int                         `json:"initial_size"`
-	DesiredSize int                         `json:"desired_size"`
-	Progress    map[string][]string         `json:"progress"`
-	Errors      map[string][]string         `json:"errors"`
-	Debug       map[string][]string         `json:"debug"`
-	Instances   []string                    `json:"instances"`
-	InProgress  []string                    `json:"in_progress"`
-	Clusterized bool                        `json:"clusterized"`
-	Summary     ClusterizationStatusSummary `json:"summary"`
+	InitialSize          int                 `json:"initial_size"`
+	DesiredSize          int                 `json:"desired_size"`
+	Progress             map[string][]string `json:"progress"`
+	Errors               map[string][]string `json:"errors"`
+	Debug                map[string][]string `json:"debug"`
+	Instances            []string            `json:"instances"`
+	Clusterized          bool                `json:"clusterized"`
+	ClusterizationTarget int                 `json:"clusterization_target"`
 }
 
 type ClusterStatus struct {

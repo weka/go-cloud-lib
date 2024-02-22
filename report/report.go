@@ -2,8 +2,9 @@ package report
 
 import (
 	"fmt"
-	"github.com/weka/go-cloud-lib/protocol"
 	"time"
+
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func UpdateReport(report protocol.Report, state *protocol.ClusterState) (err error) {
@@ -29,4 +30,11 @@ func UpdateReport(report protocol.Report, state *protocol.ClusterState) (err err
 		return
 	}
 	return
+}
+
+func AddClusterUpdate(update protocol.Update, state *protocol.ClusterState) {
+	if state.Updates == nil {
+		state.Updates = map[string]protocol.Update{}
+	}
+	state.Updates[update.To] = update
 }

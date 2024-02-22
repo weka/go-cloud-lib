@@ -1,9 +1,17 @@
 package protocol
 
 import (
-	"github.com/weka/go-cloud-lib/lib/weka"
 	"time"
+
+	"github.com/weka/go-cloud-lib/lib/weka"
 )
+
+type Update struct {
+	From  string    `json:"from"`
+	To    string    `json:"to"`
+	Time  time.Time `json:"time"`
+	Error *string   `json:"error,omitempty"`
+}
 
 type ClusterizationStatusSummary struct {
 	ReadyForClusterization int      `json:"ready_for_clusterization"`
@@ -25,6 +33,7 @@ type ClusterState struct {
 	Instances            []string            `json:"instances"`
 	Clusterized          bool                `json:"clusterized"`
 	ClusterizationTarget int                 `json:"clusterization_target"`
+	Updates              map[string]Update   `json:"updates,omitempty"`
 }
 
 type ClusterStatus struct {

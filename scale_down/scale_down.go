@@ -365,9 +365,9 @@ func allContainersInactive(hosts []hostInfo) bool {
 	return true
 }
 
-func allContainersDown(hosts []hostInfo) bool {
+func allContainersDownOrInactive(hosts []hostInfo) bool {
 	for _, host := range hosts {
-		if host.Status != "DOWN" {
+		if host.Status != "DOWN" && host.State != "INACTIVE" {
 			return false
 		}
 	}
@@ -840,10 +840,15 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 			inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 		} else if host.Status == "DOWN" {
 			logger.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
-			if !allContainersDown(machineToHostMap[host.HostIp]) {
-				logger.Fatal().Msgf("host %s is down but not all containers on the machine are down", host.id)
-			}
 			if host.managementTimedOut(ctx, downKickOutTimeout) {
+				if !allContainersDownOrInactive(machineToHostMap[host.HostIp]) {
+					response.TransientErrors = append(
+						response.TransientErrors,
+						fmt.Sprintf("host %s is down but not all containers on the machine are down", host.id),
+					)
+					continue
+				}
+
 				logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
 				downMachines = append(downMachines, host.HostIp)
 				inactiveOrDownHostsIps[host.HostIp] = types.Nilv

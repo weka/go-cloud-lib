@@ -192,6 +192,10 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	fi
 	PROXY="$PROXY_URL" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
+	if [[ "$PROXY_URL" ]]; then
+		sed -i 's/force_no_proxy=false/force_no_proxy=true/g' /etc/wekaio/service.conf
+		systemctl restart weka-agent.service
+	fi
 	`
 
 	return dedent.Dedent(installScript)

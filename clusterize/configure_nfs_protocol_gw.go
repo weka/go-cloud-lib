@@ -85,23 +85,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 			return 1
 		fi
 	}
-	
-	function create_client_group() {
-		if weka_rest "nfs/clientgroups" | grep ${client_group_name}; then
-			echo "$(date -u): client group ${client_group_name} already exists"
-			return
-		fi
-		echo "$(date -u): creating client group"
-		#weka nfs client-group add ${client_group_name}
-		weka_rest "nfs/clientgroups" "{\"name\":\"$client_group_name\"}"
-		#weka nfs rules add dns ${client_group_name} *
-		client_group_uid=$(weka_rest "nfs/clientgroups" | jq -r .data[0].uid)
-		weka_rest "nfs/clientgroups/$client_group_uid/rules" "{\"dns\":\"*\"}"
-		wait_for_weka_fs || return 1
-		#weka nfs permission add default ${client_group_name}
-		weka_rest "nfs/permissions" "{\"filesystem\":\"default\", \"group\":\"$client_group_name\"}"
-		echo "$(date -u): client group ${client_group_name} created"
-	}
 
 	function wait_for_nfs_interface_group(){
 	  max_retries=12 # 12 * 10 = 2 minutes
@@ -149,11 +132,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 
 	weka_rest interfacegroups | jq -r .data
 
-	# create client group if not exists and add rules / premissions
-	create_client_group || true
-	
-	#weka nfs client-group
-	weka_rest "nfs/clientgroups" | jq -r .data
 	echo "$(date -u): NFS setup complete"
 	
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation

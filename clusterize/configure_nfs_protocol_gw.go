@@ -2,11 +2,12 @@ package clusterize
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/bash_functions"
 	"github.com/weka/go-cloud-lib/functions_def"
 	"github.com/weka/go-cloud-lib/protocol"
-	"strings"
 )
 
 type ConfigureNfsScriptGenerator struct {
@@ -41,17 +42,11 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# weka rest function definition
 	%s
 
-	# set_backend_ip bash function definition
-	%s
-
 	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
 	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
 	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	ips_str=$(echo $fetch_result | jq -r '.backend_ips | join(",")')
 	set -x
-
-	set_backend_ip
 
 	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
@@ -63,7 +58,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 			echo "$(date -u): interface group ${interface_group_name} already exists"
 			return
 		fi
-		echo "$(date -u): creating interface group"
+		echo "$(date -u): creating interface group ${interface_group_name}"
 		#weka nfs interface-group add ${interface_group_name} NFS --subnet $subnet_mask --gateway $gateway
 		weka_rest interfacegroups "{\"name\":\"$interface_group_name\",\"type\":\"nfs\",\"subnet\":\"$subnet_mask\",\"gateway\":\"$gateway\"}"
 		echo "$(date -u): interface group ${interface_group_name} created"
@@ -151,7 +146,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Report),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization),
 		bash_functions.WekaRestFunction(),
-		bash_functions.SetBackendIpFunction(),
 	)
 
 	return dedent.Dedent(nfsSetupScript)

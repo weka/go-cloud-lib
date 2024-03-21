@@ -44,9 +44,10 @@ type ClusterStatus struct {
 }
 
 type Report struct {
-	Type     string `json:"type"`
-	Message  string `json:"message"`
-	Hostname string `json:"hostname"`
+	Type     string     `json:"type"`
+	Message  string     `json:"message"`
+	Hostname string     `json:"hostname"`
+	Protocol ProtocolGW `json:"protocol"`
 }
 
 type Reports struct {

@@ -39,6 +39,11 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# clusterize_finalization function definition
 	%s
 
+	# set_backend_ip bash function definition
+	%s
+
+	set_backend_ip
+
 	# weka rest function definition
 	%s
 
@@ -130,7 +135,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	echo "$(date -u): NFS setup complete"
 	
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"NFS configuration completed successfully\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"NFS configuration completed successfully\"}"
 
 	clusterize_finalization "{\"protocol\": \"nfs\"}"
 	`
@@ -145,6 +150,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Report),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization),
+		bash_functions.SetBackendIpFunction(),
 		bash_functions.WekaRestFunction(),
 	)
 

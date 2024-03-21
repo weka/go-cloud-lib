@@ -14,6 +14,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	wekaInstallScript := d.GetWekaInstallScript()
 	protectFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Protect)
 	clusterizeFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Clusterize)
+	reportFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
@@ -37,6 +38,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	%s
 
 	# protect function definition (if any)
+	%s
+
+	# report function definition
 	%s
 
 	# get_core_ids bash function definition
@@ -101,7 +105,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
-		gateways, clusterizeFunc, protectFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd,
+		gateways, clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(), wekaInstallScript,
 	)
 	return dedent.Dedent(script)

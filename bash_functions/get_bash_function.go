@@ -144,20 +144,24 @@ func WekaRestFunction() string {
 func SetBackendIpFunction() string {
 	s := `
 	function set_backend_ip() {
-		# requires ips_str. requires LOAD_BALANCER_IP if exists
+		# requires fetch func to be defined and LOAD_BALANCER_IP if exists
 		if [ -z "$LOAD_BALANCER_IP" ]
 		then
+			ips_str=$(fetch | jq -r '.backend_ips | join(",")')
+
 			random=$$
 			echo $random
 			ips_array=${ips_str//,/ }
 			for backend_ip in ${ips_array[@]}; do
 				if VERSION=$(curl -s -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' $backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
 					if [[ "$VERSION" != "" ]]; then
+						echo "(date -u): using backend ip: $backend_ip"
 						break
 					fi
 				fi
 			done
 		else
+			echo "(date -u): using load balancer ip: $LOAD_BALANCER_IP"
 			backend_ip="$LOAD_BALANCER_IP"
 		fi
 	}

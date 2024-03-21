@@ -2,9 +2,10 @@ package protocol
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/weka/go-cloud-lib/lib/types"
 	"github.com/weka/go-cloud-lib/lib/weka"
-	"time"
 )
 
 var Version = 1

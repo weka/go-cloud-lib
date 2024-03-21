@@ -2,6 +2,7 @@ package join
 
 import (
 	"fmt"
+
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/deploy"
 	"github.com/weka/go-cloud-lib/functions_def"
@@ -61,9 +62,9 @@ func (j *JoinNFSScriptGenerator) GetJoinNFSHostScript() string {
 
 	echo "$(date -u): NFS setup complete"
 
-	join_nfs_finalization "{\"name\": \"$instance_name\"}"
+	join_nfs_finalization "{\"name\": \"$instance_name\", \"protocol\": \"nfs\"}"
 	echo "completed successfully" > /tmp/weka_join_nfs_completion_validation
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining new NFS instance completed successfully\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"Joining new NFS instance completed successfully\"}"
 	`
 	nfsSetupScript := fmt.Sprintf(
 		joinScriptTemplate,

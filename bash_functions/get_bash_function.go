@@ -108,15 +108,24 @@ func GetHashedPrivateIpBashCmd() string {
 
 func GetWekaPartitionScript() string {
 	s := `
+	# requires 'report' function to be and PROTOCOL var (if needed)
+	handle_error() {
+	if [ "$1" -ne 0 ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"${2}\"}"
+		exit 1
+	fi
+	}
+
 	if [ ! -z "$wekaiosw_device" ]; then
 		echo "--------------------------------------------"
 		echo " Creating local filesystem on WekaIO volume "
 		echo "--------------------------------------------"
+		echo "$(date -u): wekaiosw_device: $wekaiosw_device"
 
 		sleep 4
-		mkfs.ext4 -F -L wekaiosw "$wekaiosw_device" || return 1
-		mkdir -p /opt/weka || return 1
-		mount "$wekaiosw_device" /opt/weka || return 1
+		mkfs.ext4 -F -L wekaiosw "$wekaiosw_device" || handle_error $? "Failed to create filesystem on WekaIO volume"
+		mkdir -p /opt/weka || handle_error $? "Failed to create /opt/weka directory"
+		mount "$wekaiosw_device" /opt/weka || handle_error $? "Failed to mount WekaIO volume"
 		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 	fi`
 	return dedent.Dedent(s)

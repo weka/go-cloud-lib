@@ -45,9 +45,16 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	TOKEN="%s"
 	INSTALL_URL="%s"
 	PROXY_URL="%s"
+	PROTOCOL="%s"
 	`
 	installScript := fmt.Sprintf(
-		installScriptTemplate, reportFuncDef, d.Params.WekaToken, installUrl, d.Params.ProxyUrl)
+		installScriptTemplate,
+		reportFuncDef,
+		d.Params.WekaToken,
+		installUrl,
+		d.Params.ProxyUrl,
+		d.Params.Protocol,
+	)
 
 	if strings.HasSuffix(installUrl, ".tar") || strings.Contains(installUrl, ".tar?") {
 		split := strings.Split(installUrl, "?")
@@ -91,7 +98,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 
 	installScript += `
 	chmod +x install.sh
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	status_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600')
 	if [[ "$status_code" -eq 200 ]] ; then
 		echo "Succeeded to get aws token"
@@ -101,7 +108,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		sed -i '/no_proxy/d' install.sh
 	fi
 	PROXY="$PROXY_URL" ./install.sh
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 	`
 
 	return dedent.Dedent(installScript)

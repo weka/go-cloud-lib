@@ -7,44 +7,47 @@ import (
 	"time"
 
 	"github.com/lithammer/dedent"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func ShuffleSlice(slice []string) {
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(slice), func(i, j int) { slice[i], slice[j] = slice[j], slice[i] })
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(slice), func(i, j int) { slice[i], slice[j] = slice[j], slice[i] })
 }
 
 func GetHashedPrivateIp(privateIp string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
 
-func GetScriptWithReport(message, reportFunctionDef string) string {
+func GetScriptWithReport(message, reportFunctionDef string, protocol protocol.ProtocolGW) string {
 	s := `
 	#!/bin/bash
 
 	# report function definition
 	%s
 
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"%s\"}"
+	PROTOCOL="%s"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"%s\"}"
 
 	echo "%s"
 	`
-	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, message, message)
+	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, protocol, message, message)
 }
 
-func GetErrorScript(err error, reportFunctionDef string) string {
+func GetErrorScript(err error, reportFunctionDef string, protocol protocol.ProtocolGW) string {
 	s := `
 	#!/bin/bash
 
 	# report function definition
 	%s
 
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"%s\"}"
+	PROTOCOL="%s"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"%s\"}"
 
 	<<'###ERROR'
 	%s
 	###ERROR
 	exit 1
 	`
-	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, err.Error(), err.Error())
+	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, protocol, err.Error(), err.Error())
 }

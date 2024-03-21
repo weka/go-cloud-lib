@@ -11,9 +11,10 @@ import (
 )
 
 type ConfigureNfsScriptGenerator struct {
-	Params  protocol.NFSParams
-	FuncDef functions_def.FunctionDef
-	Name    string // for aws it will be the instance id
+	Params         protocol.NFSParams
+	FuncDef        functions_def.FunctionDef
+	LoadBalancerIP string
+	Name           string // for aws it will be the instance id
 }
 
 func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
@@ -27,6 +28,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	containersUid=(%s)
 	nic_names=(%s)
 	secondary_ips=(%s)
+	LOAD_BALANCER_IP="%s"
 
 	# fetch function definition
 	%s
@@ -37,12 +39,17 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# clusterize_finalization function definition
 	%s
 
-	# weka rest function definition
+	# set_backend_ip bash function definition
+	%s
+
+	set_backend_ip
+
+	# weka rest function definition (requires $backend_ip var to be set)
 	%s
 
 	nfs_count=${#containersUid[@]}
 
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"This ($instance_name) is nfs instance $nfs_count/$nfs_count that is ready for joining the interface group\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"This ($instance_name) is nfs instance $nfs_count/$nfs_count that is ready for joining the interface group\"}"
 
 	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
@@ -132,7 +139,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	echo "$(date -u): NFS setup complete"
 	
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"NFS configuration completed successfully\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"NFS configuration completed successfully\"}"
 
 	clusterize_finalization "{\"protocol\": \"nfs\"}"
 	`
@@ -144,9 +151,11 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		strings.Join(c.Params.ContainersUid, " "),
 		strings.Join(c.Params.NicNames, " "),
 		strings.Join(c.Params.SecondaryIps, " "),
+		c.LoadBalancerIP,
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Report),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization),
+		bash_functions.SetBackendIpFunction(),
 		bash_functions.WekaRestFunction(),
 	)
 

@@ -13,6 +13,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	wekaInstallScript := d.GetWekaInstallScript()
 	protectFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Protect)
 	statusFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Status)
+	reportFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	fetchFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
@@ -29,6 +30,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	INSTALL_DPDK=%t
 	LOAD_BALANCER_IP="%s"
 	SECONDARY_IPS_NUM=%d
+	PROTOCOL="%s"
 	GATEWAYS="%s"
 
 	# protect function definition (if any)
@@ -38,6 +40,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	%s
 
 	# status function definition
+	%s
+
+	# report function definition
 	%s
 
 	# get_core_ids bash function definition
@@ -92,7 +97,13 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	echo "$(date -u): setting up weka frontend"
 
-	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $backend_ip
+	if [ -z "$LOAD_BALANCER_IP" ]; then
+		join_ips=$ips_str
+	else
+		join_ips=$LOAD_BALANCER_IP
+	fi
+
+	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips
 	
 	echo "$(date -u): success to run weka frontend container"
 
@@ -106,7 +117,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	echo "$(date -u): frontend is up"
 
-	protect "{\"vm\": \"$VM\"}"
+	protect "{\"vm\": \"$VM\", \"protocol\": \"$PROTOCOL\"}"
 	set +x
 	echo "$(date -u): try to run weka login command"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
@@ -124,9 +135,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set container_uid with frontend0 container uid
 	max_retries=12 # 12 * 10 = 2 minutes
 	for ((i=0; i<max_retries; i++)); do
-		container_data=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )')
-		container_uid=$($container_data | jq -r '.uid')
-		container_id=$($container_data | jq -r .host_id | grep -oP '\d+')
+		container_uid=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )' | jq -r '.uid')
+		container_id=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )' | jq -r .id | grep -oP '\d+')
 		if [ -n "$container_uid" ]; then
 			echo "$(date -u): frontend0 container uid: $container_uid (container id: $container_id)"
 			break
@@ -135,7 +145,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		sleep 10
 	done
 	if [ -z "$container_uid" ]; then
-		echo "$(date -u): Failed to get the frontend0 container UID."
+		msg="Failed to get the frontend0 container UID."
+		echo "$(date -u): $msg"
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$msg\"}"
 		exit 1
 	fi
 
@@ -162,14 +174,15 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 				sleep 10
 			done
 			if [ "$status" != "UP" ]; then
-				echo "$(date -u): failed to wait for the frontend0 container status to be UP"
+				msg="Failed to wait for the frontend0 container status to be UP"
+				echo "$(date -u): $msg"
+				report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$msg\"}"
 				exit 1
 			fi
 		fi
 	fi
 
 	echo "$(date -u): finished preparation for protocol setup"
-
 	`
 	script := fmt.Sprintf(
 		template,
@@ -178,10 +191,12 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		d.Params.InstallDpdk,
 		d.Params.LoadBalancerIP,
 		d.Params.NFSSecondaryIpsNum,
+		d.Params.Protocol,
 		gateways,
 		protectFunc,
 		fetchFunc,
 		statusFunc,
+		reportFunc,
 		getCoreIdsFunc,
 		getNetStrForDpdkFunc,
 		d.DeviceNameCmd,
@@ -199,8 +214,6 @@ func (d *DeployScriptGenerator) GetProtocolGWDeployScript() string {
 	clusterizeFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Clusterize)
 
 	template := `
-	PROTOCOL="%s"
-
 	# clusterize function definition
 	%s
 
@@ -208,11 +221,7 @@ func (d *DeployScriptGenerator) GetProtocolGWDeployScript() string {
 	chmod +x /tmp/clusterize.sh
 	/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 	`
-	script := fmt.Sprintf(
-		template,
-		d.Params.Protocol,
-		clusterizeFunc,
-	)
+	script := fmt.Sprintf(template, clusterizeFunc)
 
 	return baseDeploymentScript + dedent.Dedent(script)
 }

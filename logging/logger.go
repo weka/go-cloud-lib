@@ -77,6 +77,12 @@ func (l *Logger) FatalErr(err error) {
 	l.Fatal().CallerSkipFrame(1).Err(err).Send()
 }
 
+func (l *Logger) WithStrValue(key string, val string) *Logger {
+	newLogger := l.Logger.With().Str(key, val).Logger()
+	l.Logger = &newLogger
+	return l
+}
+
 func getLogLevel() zerolog.Level {
 	lvlStr := os.Getenv("LOG_LEVEL")
 	lvl := 1 // info level

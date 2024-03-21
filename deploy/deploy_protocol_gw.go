@@ -2,10 +2,11 @@ package deploy
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/bash_functions"
 	"github.com/weka/go-cloud-lib/functions_def"
-	"strings"
 )
 
 func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
@@ -25,7 +26,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	#!/bin/bash
 	VM=%s
 	FRONTEND_CONTAINER_CORES_NUM=%d
-	NICS_NUM=%s
 	INSTALL_DPDK=%t
 	LOAD_BALANCER_IP="%s"
 	SECONDARY_IPS_NUM=%d
@@ -80,40 +80,55 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		echo "Clusterized: $clusterized, going to sleep for 10 seconds"
 	done
 
-	ips_str=$(fetch | jq -r '.backend_ips | join(",")')
+	# set value for backend_ip variable
+	set_backend_ip
+	echo "(date -u): backend_ip: $backend_ip"
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		getNetStrForDpdk 1 $(($FRONTEND_CONTAINER_CORES_NUM + 1)) "$GATEWAYS"
-		weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $ips_str
 	else
-		weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids  --dedicate --join-ips $ips_str
+		net=""
 	fi
+
+	echo "$(date -u): setting up weka frontend"
+
+	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $backend_ip
+	
+	echo "$(date -u): success to run weka frontend container"
 
 	ready_containers=0
 	while [[ $ready_containers -ne 1 ]];
 	do
 		sleep 10
-		ready_containers=$( weka local ps | grep -i 'running' | wc -l )
+		ready_containers=$( weka local ps | grep frontend0 | grep -i 'running' | wc -l )
 		echo "Running containers: $ready_containers"
 	done
 
+	echo "$(date -u): frontend is up"
+
 	protect "{\"vm\": \"$VM\"}"
 	set +x
+	echo "$(date -u): try to run weka login command"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+	echo "$(date -u): success to run weka login command"
 	set -x
 	weka local ps
 
-	set_backend_ip
+	ip -o -4 addr show
 
 	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
 
+	echo "$(date -u): starting preparation for protocol setup"
+
 	# set container_uid with frontend0 container uid
 	max_retries=12 # 12 * 10 = 2 minutes
 	for ((i=0; i<max_retries; i++)); do
-		container_uid=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )' | jq -r '.uid')
+		container_data=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )')
+		container_uid=$($container_data | jq -r '.uid')
+		container_id=$($container_data | jq -r .host_id | grep -oP '\d+')
 		if [ -n "$container_uid" ]; then
-			echo "$(date -u): frontend0 container uid: $container_uid"
+			echo "$(date -u): frontend0 container uid: $container_uid (container id: $container_id)"
 			break
 		fi
 		echo "$(date -u): waiting for frontend0 container to be up"
@@ -124,12 +139,42 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		exit 1
 	fi
 
+	# get real primary ip from cloud metadata
+	# NOTE: in Azure there are situations where the primary ip is not shown as primary in ifconfig
+	primary_ip_cmd="%s"
+	if [ -n "$primary_ip_cmd" ]; then
+		primary_ip=$(eval $primary_ip_cmd)
+
+		# make primary ip the management ip for the weka container
+		if [ "$current_mngmnt_ip" != "$primary_ip" ]; then
+			weka cluster container management-ips $container_id $primary_ip
+			weka cluster container apply $container_id -f
+
+			# wait for container to be up
+			max_retries=12 # 12 * 10 = 2 minutes
+			for ((i=0; i<max_retries; i++)); do
+				status=$(weka cluster container $container_id | grep $container_id | awk '{print $5}')
+				if [ "$status" == "UP" ]; then
+					echo "$(date -u): frontend0 container status: $status"
+					break
+				fi
+				echo "$(date -u): waiting for frontend0 container status to be UP, current status: $status"
+				sleep 10
+			done
+			if [ "$status" != "UP" ]; then
+				echo "$(date -u): failed to wait for the frontend0 container status to be UP"
+				exit 1
+			fi
+		fi
+	fi
+
+	echo "$(date -u): finished preparation for protocol setup"
+
 	`
 	script := fmt.Sprintf(
 		template,
 		d.Params.VMName,
 		d.Params.NFSProtocolGatewayFeCoresNum,
-		d.Params.NicsNum,
 		d.Params.InstallDpdk,
 		d.Params.LoadBalancerIP,
 		d.Params.NFSSecondaryIpsNum,
@@ -144,6 +189,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		wekaInstallScript,
 		wekaRestFunc,
 		setBackendIpFunc,
+		d.Params.GetPrimaryIpCmd,
 	)
 	return dedent.Dedent(script)
 }

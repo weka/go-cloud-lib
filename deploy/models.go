@@ -2,10 +2,11 @@ package deploy
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/functions_def"
 	"github.com/weka/go-cloud-lib/protocol"
-	"strings"
 )
 
 type DeploymentParams struct {
@@ -25,6 +26,7 @@ type DeploymentParams struct {
 	NFSSecondaryIpsNum           int    //for NFS protocol gw setup
 	NFSProtocolGatewayFeCoresNum int    //for NFS protocol gw setup
 	LoadBalancerIP               string
+	GetPrimaryIpCmd              string
 }
 
 type DeployScriptGenerator struct {
@@ -73,10 +75,11 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 			while [ $count -gt 0 ]; do
 					"$@" && break
 					count=$(($count - 1))
+					echo "Retrying $* in $retry_sleep seconds..."
 					sleep $retry_sleep
 			done
 			[ $count -eq 0 ] && {
-					echo "Retry failed [$retry_max]"
+					echo "$(date -u): Retry failed [$retry_max]"
 					return 1
 			}
 			return 0

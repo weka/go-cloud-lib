@@ -75,6 +75,7 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 	weka local stop
 	weka local rm default --force
 
+
 	# weka containers setup
 	get_core_ids $DRIVE_CONTAINER_CORES_NUM drive_core_ids
 	get_core_ids $COMPUTE_CONTAINER_CORES_NUM compute_core_ids
@@ -111,7 +112,7 @@ func (d *DeployScriptGenerator) GetDeployScript() string {
 		ready_containers=$( weka local ps | grep -i 'running' | wc -l )
 		echo "Running containers: $ready_containers"
 	done
-
+	
 	protect "{\"vm\": \"$VM\"}"
 	clusterize "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 	chmod +x /tmp/clusterize.sh
@@ -191,6 +192,10 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		sed -i '/no_proxy/d' install.sh
 	fi
 	PROXY="$PROXY_URL" ./install.sh
+	if [[ "$PROXY_URL" && "$status_code" -eq 200 ]]; then
+		sed -i 's/force_no_proxy=false/force_no_proxy=true/g' /etc/wekaio/service.conf
+		weka agent install-agent
+	fi
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 	`
 

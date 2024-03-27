@@ -507,6 +507,16 @@ func getHostGroupHosts(hosts map[weka.HostId]hostInfo, instances []protocol.HgIn
 	return hgHosts
 }
 
+func getNfsHosts(hosts map[weka.HostId]hostInfo, nfsHostsMap map[weka.HostId]NfsHost) map[weka.HostId]hostInfo {
+	nfsHosts := make(map[weka.HostId]hostInfo)
+	for hostId, host := range hosts {
+		if _, ok := nfsHostsMap[hostId]; ok {
+			nfsHosts[hostId] = host
+		}
+	}
+	return nfsHosts
+}
+
 func getLeftoverHosts(hosts map[weka.HostId]hostInfo, instances []protocol.HgInstance) map[weka.HostId]hostInfo {
 	hgHosts := make(map[weka.HostId]hostInfo)
 	for hostId, host := range hosts {
@@ -617,12 +627,20 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	}
 
 	nfsHostsMap, err := GetNfsHostsMap(ctx, jpool)
+	leftOverNfsHosts := make(map[weka.HostId]hostInfo)
 	if err != nil {
 		response.AddTransientError(err, "GetNfsHostsMap")
 	} else {
 		logger.Info().Msg("Running scale down on NFS hosts...")
 		hgHosts = getHostGroupHosts(hosts, info.NfsBackendInstances)
-		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, hgHosts, info.NFSBackendsDesiredCapacity, &response, nfsHostsMap)
+		nfsHosts := getNfsHosts(hgHosts, nfsHostsMap)
+		for hostId, host := range hgHosts {
+			if _, ok := nfsHosts[hostId]; !ok {
+				logger.Info().Msgf("Host %s:%s is not in NFS interface group", host.HostIp, host.id)
+			}
+			leftOverNfsHosts[hostId] = host
+		}
+		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, nfsHosts, info.NFSBackendsDesiredCapacity, &response, nfsHostsMap)
 		if err2 != nil {
 			errs = append(errs, err2)
 		}
@@ -631,6 +649,9 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	instances := info.WekaBackendInstances
 	instances = append(instances, info.NfsBackendInstances...)
 	hgHosts = getLeftoverHosts(hosts, instances)
+	for hostId, host := range leftOverNfsHosts {
+		hgHosts[hostId] = host
+	}
 	handleLeftOverHosts(ctx, jpool, instances, hgHosts, -1, &response, nfsHostsMap, info.DownBackendsRemovalTimeout)
 
 	validateDelta(ctx, &response, jpool, instances)
@@ -664,7 +685,11 @@ func ScaleHgDown(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgI
 		NEW_D = max(A+U+D-T, min(2-D, U), 0)
 	*/
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Running HG scale down (%s)", getHostIdsString(hosts))
+	if len(nfsHostsMap) > 0 {
+		logger.Info().Msgf("Running NFS HG scale down (%s)", getHostIdsString(hosts))
+	} else {
+		logger.Info().Msgf("Running HG scale down (%s)", getHostIdsString(hosts))
+	}
 
 	var hostsList []hostInfo
 	var machinesIps []string
@@ -825,6 +850,7 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 	logger.Info().Msgf("Handling leftover hosts (%s)", getHostIdsString(hosts))
 
 	var downMachines []string
+	var hostsList []hostInfo
 	inactiveMachines := make(map[string][]hostInfo)
 	inactiveOrDownHostsIps := make(map[string]types.Nilt)
 	machineToHostMap := getMachineToHostMap(ctx, hosts)
@@ -832,12 +858,17 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 		if host.Mode == "client" {
 			continue
 		}
+
+		if _, ok := inactiveOrDownHostsIps[host.HostIp]; ok {
+			continue
+		}
+
 		if host.State == "INACTIVE" {
 			logger.Info().Msgf("host %s is inactive and does not belong to HG", host.id)
 			if allContainersInactive(machineToHostMap[host.HostIp]) {
 				inactiveMachines[host.HostIp] = machineToHostMap[host.HostIp]
+				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 			}
-			inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 		} else if host.Status == "DOWN" {
 			logger.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
 			if host.managementTimedOut(ctx, downKickOutTimeout) {
@@ -852,9 +883,12 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 				logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
 				downMachines = append(downMachines, host.HostIp)
 				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
+			} else {
+				hostsList = append(hostsList, host)
 			}
 		} else {
-			logger.Fatal().Msgf("host %s is active and does not belong to HG", host.id)
+			hostsList = append(hostsList, host)
+			logger.Info().Msgf("host %s:%s is active and does not belong to HG", host.HostIp, host.id)
 		}
 	}
 	removeInactive(ctx, inactiveMachines, jpool, instances, response)
@@ -867,5 +901,15 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 	for _, hostIp := range downMachines {
 		eventParams.reason = DownMachineEvent
 		deactivateMachine(ctx, jpool, machineToHostMap[hostIp], response, &eventParams, nfsHostsMap)
+	}
+
+	for _, host := range hostsList {
+		response.Hosts = append(response.Hosts, protocol.ScaleResponseHost{
+			InstanceId: host.Aws.InstanceId,
+			PrivateIp:  host.HostIp,
+			State:      host.State,
+			AddedTime:  host.AddedTime,
+			HostId:     host.id,
+		})
 	}
 }

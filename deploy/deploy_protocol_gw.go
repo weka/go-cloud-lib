@@ -124,6 +124,10 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		exit 1
 	fi
 
+	if [[ "$PROXY_URL" ]]; then
+		sed -i 's/force_no_proxy=false/force_no_proxy=true/g' /etc/wekaio/service.conf
+		systemctl restart weka-agent
+	fi
 	`
 	script := fmt.Sprintf(
 		template,

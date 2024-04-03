@@ -94,6 +94,12 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	done
 
 	protect "{\"vm\": \"$VM\"}"
+
+	if [[ "$PROXY_URL" ]]; then
+		sed -i 's/force_no_proxy=false/force_no_proxy=true/g' /etc/wekaio/service.conf
+		systemctl restart weka-agent
+	fi
+
 	clusterize "{\"name\": \"$VM\"}" > /tmp/clusterize.sh
 	chmod +x /tmp/clusterize.sh
 	/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log

@@ -637,8 +637,8 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		for hostId, host := range hgHosts {
 			if _, ok := nfsHosts[hostId]; !ok {
 				logger.Info().Msgf("Host %s:%s is not in NFS interface group", host.HostIp, host.id)
+				leftOverNfsHosts[hostId] = host
 			}
-			leftOverNfsHosts[hostId] = host
 		}
 		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, nfsHosts, info.NFSBackendsDesiredCapacity, &response, nfsHostsMap)
 		if err2 != nil {

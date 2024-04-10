@@ -25,6 +25,7 @@ import (
 type hostState int
 
 const unhealthyDeactivateTimeout = 120 * time.Minute
+const notPartOfNFSInterfaceGroupTimeout = time.Hour
 
 func (h hostState) String() string {
 	switch h {
@@ -64,6 +65,7 @@ const (
 	ScaleDownEvent       EventReason = "scale down"
 	InactiveMachineEvent EventReason = "inactive machine"
 	DownMachineEvent     EventReason = "down machine"
+	NfsLeftoverEvent     EventReason = "nfs leftover"
 )
 
 type deactivateEventInfo struct {
@@ -638,9 +640,21 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 			if _, ok := nfsHosts[hostId]; !ok {
 				logger.Info().Msgf("Host %s:%s is not in NFS interface group", host.HostIp, host.id)
 				leftOverNfsHosts[hostId] = host
+
+				eventParams := deactivateEventInfo{
+					currentSize: len(info.NfsBackendInstances),
+					desiredSize: info.NfsBackendsDesiredCapacity,
+					reason:      NfsLeftoverEvent,
+				}
+
+				if _, ok := info.NfsInterfaceGroupInstanceIps[host.HostIp]; ok {
+					deactivateMachine(ctx, jpool, []hostInfo{host}, &response, &eventParams, nfsHostsMap)
+				} else if host.managementTimedOut(ctx, notPartOfNFSInterfaceGroupTimeout) {
+					deactivateMachine(ctx, jpool, []hostInfo{host}, &response, &eventParams, nfsHostsMap)
+				}
 			}
 		}
-		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, nfsHosts, info.NFSBackendsDesiredCapacity, &response, nfsHostsMap)
+		err2 := ScaleHgDown(ctx, jpool, info.NfsBackendInstances, nfsHosts, info.NfsBackendsDesiredCapacity, &response, nfsHostsMap)
 		if err2 != nil {
 			errs = append(errs, err2)
 		}
@@ -888,7 +902,7 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 			}
 		} else {
 			hostsList = append(hostsList, host)
-			logger.Info().Msgf("host %s:%s is active and does not belong to HG", host.HostIp, host.id)
+			logger.Warn().Msgf("host %s:%s is active and does not belong to HG", host.HostIp, host.id)
 		}
 	}
 	removeInactive(ctx, inactiveMachines, jpool, instances, response)

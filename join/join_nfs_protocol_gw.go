@@ -12,6 +12,7 @@ type JoinNFSScriptGenerator struct {
 	DeploymentParams   deploy.DeploymentParams
 	InterfaceGroupName string
 	FuncDef            functions_def.FunctionDef
+	Name               string //for AWS we provide here the instance id
 }
 
 func (j *JoinNFSScriptGenerator) GetJoinNFSHostScript() string {
@@ -21,8 +22,18 @@ func (j *JoinNFSScriptGenerator) GetJoinNFSHostScript() string {
 		Params:        j.DeploymentParams,
 	}
 	deploymentBashScript := deployScriptGenerator.GetBaseProtocolGWDeployScript()
+	joinNfsFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinNfsFinalization)
+	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinScriptTemplate := `
 	interface_group_name="%s"
+
+	# join_nfs_finalization function definition
+	%s
+
+	# report function definition
+	%s
+
+	instance_name="%s"
 
 	function wait_for_nfs_interface_group(){
 	  max_retries=12 # 12 * 10 = 2 minutes
@@ -49,10 +60,17 @@ func (j *JoinNFSScriptGenerator) GetJoinNFSHostScript() string {
 	weka_rest interfacegroups | jq -r .data
 
 	echo "$(date -u): NFS setup complete"
+
+	join_nfs_finalization "{\"name\": \"$instance_name\"}"
+	echo "completed successfully" > /tmp/weka_join_nfs_completion_validation
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining new NFS instance completed successfully\"}"
 	`
 	nfsSetupScript := fmt.Sprintf(
 		joinScriptTemplate,
 		j.InterfaceGroupName,
+		joinNfsFinalizationFunc,
+		reportFunc,
+		j.Name,
 	)
 
 	return deploymentBashScript + dedent.Dedent(nfsSetupScript)

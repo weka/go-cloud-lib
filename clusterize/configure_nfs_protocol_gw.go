@@ -12,16 +12,16 @@ import (
 type ConfigureNfsScriptGenerator struct {
 	Params         protocol.NFSParams
 	FuncDef        functions_def.FunctionDef
-	WekaUsername   string
-	WekaPassword   string
 	LoadBalancerIP string
+	Name           string // for aws it will be the instance id
 }
 
 func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	configureNFSScriptTemplate := `
 	#!/bin/bash
 	set -ex
-
+	
+	instance_name="%s"
 	interface_group_name="%s"
 	client_group_name="%s"
 	containersUid=(%s)
@@ -43,6 +43,10 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 
 	# set_backend_ip bash function definition
 	%s
+
+	nfs_count=${#containersUid[@]}
+
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"This ($instance_name) is nfs instance $nfs_count/$nfs_count that is ready for joining the interface group\"}"
 
 	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
@@ -141,6 +145,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	`
 	nfsSetupScript := fmt.Sprintf(
 		configureNFSScriptTemplate,
+		c.Name,
 		c.Params.InterfaceGroupName,
 		c.Params.ClientGroupName,
 		strings.Join(c.Params.ContainersUid, " "),

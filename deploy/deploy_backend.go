@@ -100,6 +100,8 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 		systemctl status weka-agent || true
 		systemctl start weka-agent
 		systemctl status weka-agent || true
+		systemctl restart weka-agent
+		systemctl status weka-agent || true
 	fi
 
 	clusterize "{\"name\": \"$VM\"}" > /tmp/clusterize.sh

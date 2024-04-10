@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"github.com/weka/go-cloud-lib/lib/types"
 	"github.com/weka/go-cloud-lib/lib/weka"
 	"time"
 )
@@ -14,16 +15,17 @@ type HgInstance struct {
 }
 
 type HostGroupInfoResponse struct {
-	Username                    string        `json:"username"`
-	Password                    string        `json:"password"`
-	WekaBackendsDesiredCapacity int           `json:"weka_backends_desired_capacity"`
-	NFSBackendsDesiredCapacity  int           `json:"nfs_backends_desired_capacity"`
-	WekaBackendInstances        []HgInstance  `json:"weka_backend_instances"`
-	NfsBackendInstances         []HgInstance  `json:"nfs_backend_instances"`
-	DownBackendsRemovalTimeout  time.Duration `json:"down_backends_removal_timeout"`
-	BackendIps                  []string      `json:"backend_ips"`
-	Role                        string        `json:"role"`
-	Version                     int           `json:"version"`
+	Username                     string                `json:"username"`
+	Password                     string                `json:"password"`
+	WekaBackendsDesiredCapacity  int                   `json:"weka_backends_desired_capacity"`
+	NfsBackendsDesiredCapacity   int                   `json:"nfs_backends_desired_capacity"`
+	WekaBackendInstances         []HgInstance          `json:"weka_backend_instances"`
+	NfsBackendInstances          []HgInstance          `json:"nfs_backend_instances"`
+	NfsInterfaceGroupInstanceIps map[string]types.Nilt `json:"nfs_interface_group_instance_ips"` // the key is the instance ip
+	DownBackendsRemovalTimeout   time.Duration         `json:"down_backends_removal_timeout"`
+	BackendIps                   []string              `json:"backend_ips"`
+	Role                         string                `json:"role"`
+	Version                      int                   `json:"version"`
 }
 
 type ScaleResponseHost struct {

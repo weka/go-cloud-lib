@@ -51,3 +51,12 @@ func GetErrorScript(err error, reportFunctionDef string, protocol protocol.Proto
 	`
 	return fmt.Sprintf(dedent.Dedent(s), reportFunctionDef, protocol, err.Error(), err.Error())
 }
+
+func IsItemInList(item string, list []string) bool {
+	for _, listItem := range list {
+		if item == listItem {
+			return true
+		}
+	}
+	return false
+}

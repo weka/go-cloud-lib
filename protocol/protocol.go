@@ -25,6 +25,7 @@ type HostGroupInfoResponse struct {
 	NfsInterfaceGroupInstanceIps map[string]types.Nilt `json:"nfs_interface_group_instance_ips"` // the key is the instance ip
 	DownBackendsRemovalTimeout   time.Duration         `json:"down_backends_removal_timeout"`
 	BackendIps                   []string              `json:"backend_ips"`
+	TerminatedHgsIps             map[string]types.Nilt `json:"terminated_hgs_ips"`
 	Role                         string                `json:"role"`
 	Version                      int                   `json:"version"`
 }

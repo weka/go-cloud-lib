@@ -66,6 +66,7 @@ const (
 	InactiveMachineEvent EventReason = "inactive machine"
 	DownMachineEvent     EventReason = "down machine"
 	NfsLeftoverEvent     EventReason = "nfs leftover"
+	TerminatedMachine    EventReason = "terminated machine"
 )
 
 type deactivateEventInfo struct {
@@ -662,11 +663,11 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 	instances := info.WekaBackendInstances
 	instances = append(instances, info.NfsBackendInstances...)
-	hgHosts = getLeftoverHosts(hosts, instances)
+	leftOverHosts := getLeftoverHosts(hosts, instances)
 	for hostId, host := range leftOverNfsHosts {
-		hgHosts[hostId] = host
+		leftOverHosts[hostId] = host
 	}
-	handleLeftOverHosts(ctx, jpool, instances, hgHosts, -1, &response, nfsHostsMap, info.DownBackendsRemovalTimeout)
+	handleLeftOverHosts(ctx, jpool, instances, leftOverHosts, -1, &response, nfsHostsMap, info.DownBackendsRemovalTimeout, info.TerminatedHgsIps)
 
 	validateDelta(ctx, &response, jpool, instances)
 
@@ -859,16 +860,30 @@ CloudIps:
 	}
 }
 
-func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, hosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost, downKickOutTimeout time.Duration) {
+func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []protocol.HgInstance, leftOverHosts hostsMap, desiredCapacity int, response *protocol.ScaleResponse, nfsHostsMap map[weka.HostId]NfsHost, downKickOutTimeout time.Duration, terminatedHgsIps map[string]types.Nilt) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Handling leftover hosts (%s)", getHostIdsString(hosts))
+	logger.Info().Msgf("Handling leftover hosts (%s)", getHostIdsString(leftOverHosts))
 
 	var downMachines []string
 	var hostsList []hostInfo
 	inactiveMachines := make(map[string][]hostInfo)
 	inactiveOrDownHostsIps := make(map[string]types.Nilt)
-	machineToHostMap := getMachineToHostMap(ctx, hosts)
-	for _, host := range hosts {
+	machineToHostMap := getMachineToHostMap(ctx, leftOverHosts)
+
+	terminatedEventParams := deactivateEventInfo{
+		currentSize: desiredCapacity,
+		desiredSize: desiredCapacity,
+		reason:      TerminatedMachine,
+	}
+	for hostIp, machineHosts := range machineToHostMap {
+		if _, ok := terminatedHgsIps[hostIp]; ok {
+			if allContainersDownOrInactive(machineHosts) {
+				deactivateMachine(ctx, jpool, machineToHostMap[hostIp], response, &terminatedEventParams, nfsHostsMap)
+			}
+		}
+	}
+
+	for _, host := range leftOverHosts {
 		if host.Mode == "client" {
 			continue
 		}

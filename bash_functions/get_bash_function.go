@@ -138,11 +138,11 @@ func WekaRestFunction() string {
 		endpoint="$1"
 		data="$2"
 		set +x
-		access_token=$(curl -X POST "http://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}" | jq -r '.data.access_token')
+		access_token=$(curl -X POST -k "https://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}" | jq -r '.data.access_token')
 		if [ -z "$data" ]; then
-			curl "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" || (echo "weka rest api get request failed: $endpoint" && return 1)
+			curl -k "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" || (echo "weka rest api get request failed: $endpoint" && return 1)
 		else
-			curl -X POST "$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data"  || (echo "weka rest api post request failed: $endpoint $data" && return 1)
+			curl -X POST -k "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data"  || (echo "weka rest api post request failed: $endpoint $data" && return 1)
 		fi
 		set -x
 	}
@@ -162,7 +162,7 @@ func SetBackendIpFunction() string {
 			echo $random
 			ips_array=${ips_str//,/ }
 			for backend_ip in ${ips_array[@]}; do
-				if VERSION=$(curl -s -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' $backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
+				if VERSION=$(curl -s -k -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' "https://$backend_ip:14000/api/v1" | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
 					if [[ "$VERSION" != "" ]]; then
 						echo "(date -u): using backend ip: $backend_ip"
 						break

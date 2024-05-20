@@ -94,11 +94,14 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 			fi
 		fi
 	done
+	
+	IFS=$'\n' interfaces=($(ls /sys/class/net | grep -v lo | grep -v docker0 | grep -v enP | sort))
+	first_interface="${interfaces[0]}"
 
-	ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
+	ip=$(ifconfig $first_interface | grep "inet " | awk '{ print $2}')
 	while [ ! $ip ] ; do
 		sleep 1
-		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
+		ip=$(ifconfig $first_interface | grep "inet " | awk '{ print $2}')
 	done
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
@@ -116,12 +119,16 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	get_core_ids $DRIVES drive_core_ids
 	get_core_ids $COMPUTE compute_core_ids
 
+	second_interface="${interfaces[1]}"
+	interface_num=$(echo "${second_interface:3}")
+	interface_str=$(echo "${second_interface::-1}")
+
 	mgmt_ip=$(hostname -I | awk '{print $1}')
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $(($DRIVES+1)) "$GATEWAYS"
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate $net
-		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE)) "$GATEWAYS"
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate $net
+		net_value=$(getNetStrForDpdk $interface_num $(($DRIVES+$interface_num)) "$interface_str" "$GATEWAYS")
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate $net_value
+		net_value=$(getNetStrForDpdk $(($interface_num+$DRIVES)) $(($interface_num+$DRIVES+$COMPUTE)) "$interface_str" "$GATEWAYS")
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate $net_value
 	else
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate --net udp
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate --net udp
@@ -130,8 +137,8 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	if [[ $FRONTEND -gt 0 ]]; then
 		get_core_ids $FRONTEND frontend_core_ids
 		if [[ $INSTALL_DPDK == true ]]; then
-			getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1)) "$GATEWAYS"
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate $net
+			net_value=$(getNetStrForDpdk $(($interface_num+$DRIVES+$COMPUTE)) $(($interface_num+$DRIVES+$COMPUTE+1)) "$interface_str" "$GATEWAYS")
+			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate $net_value
 		else
 			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate --net udp
 		fi

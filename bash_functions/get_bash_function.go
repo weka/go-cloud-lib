@@ -77,25 +77,30 @@ func GetNetStrForDpdk() string {
 		i=$1
 		j=$2
 		gateways=$3
-		gateways=($gateways) #azure and gcp
+		#gateways=($gateways) #azure and gcp
+		IFS=' ' read -r -a gateways <<< "$gateways"
 
-		net=""
+		first_interface=$(ip -o link show | awk -F ': ' '!/docker0/ && !/lo/ {print $2}' | sort | head -n 1)
+		interface_str=$(echo $first_interface | awk '{gsub(/[0-9]/,"",$1); print $1}')
+
+		#net=""
+		gateway_index=0
 		for ((i; i<$j; i++)); do
-			eth=eth$i
-			subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
-			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
-				net="$net --net $eth" #aws
+			subnet_inet=$(ifconfig $interface_str$i | grep 'inet ' | awk '{print $2}')
+			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then #aws
+				net="--net ens6" 
 				continue
 			fi
-			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
+			enp=$(ls -l /sys/class/net/$interface_str$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
 			if [ -z $enp ];then
-				enp=$(ethtool -i $eth | grep bus-info | awk '{print $2}') #pci for gcp
+				enp=$(ethtool -i $interface_str$i | grep bus-info | awk '{print $2}') #pci for gcp
 			fi
-			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
+			bits=$(ip -o -f inet addr show $interface_str$i | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
-			
-			gateway=${gateways[$i]}
+
+			gateway=${gateways["$gateway_index"]}
 			net="$net --net $enp/$subnet_inet/${netmask[1]}/$gateway"
+			gateway_index=$(($gateway_index+1))
 		done
 	}
 	`

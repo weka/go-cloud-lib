@@ -187,7 +187,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	script := fmt.Sprintf(
 		template,
 		d.Params.VMName,
-		d.Params.NFSProtocolGatewayFeCoresNum,
+		d.Params.ProtocolGatewayFeCoresNum,
 		d.Params.InstallDpdk,
 		d.Params.LoadBalancerIP,
 		d.Params.NFSSecondaryIpsNum,

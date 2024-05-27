@@ -133,7 +133,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	echo "$(date -u): starting preparation for protocol setup"
 
 	# set container_uid with frontend0 container uid
-	max_retries=12 # 12 * 10 = 2 minutes
+	max_retries=30 # 30 * 10 = 5 minutes
 	for ((i=0; i<max_retries; i++)); do
 		container_uid=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )' | jq -r '.uid')
 		container_id=$(weka_rest containers | jq .data | jq -r --arg HOSTNAME "$HOSTNAME" '.[] | select ( .container_name == "frontend0" and .status == "UP" and .hostname == $HOSTNAME )' | jq -r .id | grep -oP '\d+')

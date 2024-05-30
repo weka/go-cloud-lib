@@ -10,6 +10,7 @@ import (
 const hostIdPrefix = "HostId<"
 const driveIdPrefix = "DiskId<"
 const nodeIdPrefix = "NodeId<"
+const overrideIdPrefix = "ManualOverrideId<"
 
 type HostId struct {
 	hostId     int
@@ -105,4 +106,32 @@ func unmarshalPrefixedID(prefix, text []byte) (int, error) {
 		return -1, nil
 	}
 	return strconv.Atoi(val)
+}
+
+type OverrideId struct {
+	overrideId     int
+	wekaOverrideId string
+}
+
+func (o *OverrideId) Int() int {
+	return o.overrideId
+}
+
+func (o *OverrideId) String() string {
+	return o.wekaOverrideId
+}
+
+func (o *OverrideId) MarshalText() ([]byte, error) {
+	return []byte(o.wekaOverrideId), nil
+}
+
+func (o *OverrideId) UnmarshalText(bytes []byte) error {
+	hid, err := unmarshalPrefixedID([]byte(overrideIdPrefix), bytes)
+	o.wekaOverrideId = string(bytes)
+	if err != nil {
+		log.Error().Err(err)
+		return err
+	}
+	o.overrideId = hid
+	return nil
 }

@@ -19,13 +19,15 @@ const (
 	JrpcStatus                   JrpcMethod = "status"
 	JrpcEmitCustomEvent          JrpcMethod = "events_trigger_custom"
 	JrpcInterfaceGroupList       JrpcMethod = "interface_group_list"
-	JrpcinterfaceGroupDeletePort JrpcMethod = "interface_group_delete_port"
+	JrpcInterfaceGroupDeletePort JrpcMethod = "interface_group_delete_port"
+	JrpcManualOverrideList       JrpcMethod = "manual_override_list"
 )
 
 type HostListResponse map[HostId]Host
 type DriveListResponse map[DriveId]Drive
 type NodeListResponse map[NodeId]Node
 type InterfaceGroupListResponse []InterfaceGroup
+type ManualDebugOverrideListResponse map[OverrideId]DebugOverride
 
 type Activity struct {
 	NumOps                    float32 `json:"num_ops"`
@@ -100,4 +102,18 @@ type InterfaceGroup struct {
 	Type            string               `json:"type"`
 	Gateway         string               `json:"gateway"`
 	Status          string               `json:"status"`
+}
+
+type DebugOverride struct {
+	BucketId     string      `json:"bucket_id"`
+	BucketString string      `json:"bucket_string"`
+	Comment      string      `json:"comment"`
+	Enabled      bool        `json:"enabled"`
+	Forced       bool        `json:"forced"`
+	Key          string      `json:"key"`
+	NegateBucket bool        `json:"negate_bucket"`
+	OverrideId   string      `json:"override_id"`
+	TimeCreated  time.Time   `json:"time_created"`
+	TimeEnabled  bool        `json:"time_enabled"`
+	Value        interface{} `json:"value"`
 }

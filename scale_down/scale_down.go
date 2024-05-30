@@ -419,7 +419,7 @@ func deactivateMachine(ctx context.Context, jpool *jrpc.Pool, machineHosts []hos
 			if _, ok := nfsHostsMap[host.id]; !ok {
 				continue
 			}
-			err1 := jpool.Call(weka.JrpcinterfaceGroupDeletePort, types.JsonDict{
+			err1 := jpool.Call(weka.JrpcInterfaceGroupDeletePort, types.JsonDict{
 				"name":    nfsHostsMap[host.id].InterfaceGroupName,
 				"host_id": nfsHostsMap[host.id].HostId.String(),
 				"port":    nfsHostsMap[host.id].Port,
@@ -556,6 +556,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	driveApiList := weka.DriveListResponse{}
 	nodeApiList := weka.NodeListResponse{}
 	interfaceGroupList := weka.InterfaceGroupListResponse{}
+	manualDebugOverrideList := weka.ManualDebugOverrideListResponse{}
 
 	err = jpool.Call(weka.JrpcStatus, struct{}{}, &systemStatus)
 	if err != nil {
@@ -567,6 +568,20 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		logger.Error().Err(err).Send()
 		return
 	}
+
+	err = jpool.Call(weka.JrpcManualOverrideList, struct{}{}, &manualDebugOverrideList)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	for _, manualOverride := range manualDebugOverrideList {
+		if manualOverride.Key == "skip_scale_down" {
+			err = fmt.Errorf("skipping scale down due to manual override")
+			logger.Error().Err(err).Send()
+			return
+		}
+	}
+
 	err = jpool.Call(weka.JrpcHostList, struct{}{}, &hostsApiList)
 	if err != nil {
 		logger.Error().Err(err).Send()

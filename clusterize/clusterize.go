@@ -106,7 +106,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
-	
+	exit 0
 	if [[ $INSTALL_DPDK == true ]]; then
 		%s
 	fi

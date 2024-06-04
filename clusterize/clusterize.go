@@ -134,18 +134,16 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	for drive_num in "${DRIVE_NUMS[@]}"; do
 		bad_drives=false
 		for (( d=0; d<$NVMES_NUM; d++ )); do
-			while true; do
-				if lsblk "${devices[$d]}" >/dev/null 2>&1 ;then
-					if ! weka cluster drive add $drive_num "${devices[$d]}"; then
-						report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drive: $drive_num ${devices[$d]}\"}"
-						bad_drives=true
-					fi
-					break
-				fi
+			while ! lsblk "${devices[$d]}" >/dev/null 2>&1; do
 				echo "waiting for nvme to be ready"
 				sleep 5
 			done
 		done
+		devices_str=$(IFS=' ' ;echo "${devices[*]}")
+		if ! weka cluster drive add $drive_num $devices_str; then
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_num: $devices_str\"}"
+			bad_drives=true
+		fi
 
 		if [ $bad_drives = true ]; then
 			weka_hostname=$(weka cluster container -c $drive_num | tail -n +2 | awk '{print $2}')

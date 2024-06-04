@@ -29,6 +29,12 @@ type HostGroupInfoResponse struct {
 	Version                      int                   `json:"version"`
 }
 
+// Use value receiver to make sure the original instance is not modified
+func (hg HostGroupInfoResponse) WithHiddenPassword() HostGroupInfoResponse {
+	hg.Password = "********"
+	return hg
+}
+
 type ScaleResponseHost struct {
 	InstanceId string      `json:"instance_id"`
 	PrivateIp  string      `json:"private_ip"`

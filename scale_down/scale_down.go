@@ -534,8 +534,15 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	logger.Info().Msg("Running scale down...")
 	response.Version = protocol.Version
 
+	err = info.Validate()
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
 	if info.Role != "backend" {
 		logger.Info().Msg("Skipping scale down, not a backend")
+		return
 	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {

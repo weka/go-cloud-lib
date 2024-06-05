@@ -29,10 +29,38 @@ type HostGroupInfoResponse struct {
 	Version                      int                   `json:"version"`
 }
 
-// Use value receiver to make sure the original instance is not modified
-func (hg HostGroupInfoResponse) WithHiddenPassword() HostGroupInfoResponse {
-	hg.Password = "********"
-	return hg
+func (hg *HostGroupInfoResponse) WithHiddenPassword() HostGroupInfoResponse {
+	hgCopy := *hg
+	hgCopy.Password = "********"
+	return hgCopy
+}
+
+func (hg *HostGroupInfoResponse) Validate() error {
+	var errs []error
+	if hg.Username == "" {
+		err := fmt.Errorf("username is empty")
+		errs = append(errs, err)
+	}
+	if hg.Password == "" {
+		err := fmt.Errorf("password is empty")
+		errs = append(errs, err)
+	}
+	if hg.Role == "" {
+		err := fmt.Errorf("role is empty")
+		errs = append(errs, err)
+	}
+	if hg.WekaBackendsDesiredCapacity <= 0 {
+		err := fmt.Errorf("weka_backends_desired_capacity should greater than 0")
+		errs = append(errs, err)
+	}
+	if hg.DownBackendsRemovalTimeout <= 0 {
+		err := fmt.Errorf("down_backends_removal_timeout should greater than 0")
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("validation failed: %v", errs)
+	}
+	return nil
 }
 
 type ScaleResponseHost struct {

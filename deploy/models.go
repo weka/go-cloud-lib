@@ -16,7 +16,9 @@ type DeploymentParams struct {
 	WekaToken                 string
 	InstallDpdk               bool
 	NicsNum                   string
+	NvmesNum                  int
 	ProxyUrl                  string
+	FindDrivesScript          string
 	Gateways                  []string
 	Protocol                  protocol.ProtocolGW
 	WekaUsername              string //for protocol gw setup
@@ -92,6 +94,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 			return 0
 		}
 
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Downloading weka install script\"}"
 		retry 300 2 curl --fail --proxy "$PROXY_URL" --max-time 10 "$INSTALL_URL" -o install.sh
 		`
 	}

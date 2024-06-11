@@ -21,7 +21,6 @@ type ClusterParams struct {
 	ClusterName               string
 	Prefix                    string
 	ClusterizationTarget      int
-	NvmesNum                  int
 	WekaUsername              string
 	WekaPassword              string
 	SetObs                    bool
@@ -55,7 +54,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	IPS=(%s)
 	CLUSTER_NAME=%s
 	HOSTS_NUM=%d
-	NVMES_NUM=%d
 	SET_OBS=%t
 	SMBW_ENABLED=%t
 	STRIPE_WIDTH=%d
@@ -133,12 +131,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
 	for drive_num in "${DRIVE_NUMS[@]}"; do
 		bad_drives=false
-		for (( d=0; d<$NVMES_NUM; d++ )); do
-			while ! lsblk "${devices[$d]}" >/dev/null 2>&1; do
-				echo "waiting for nvme to be ready"
-				sleep 5
-			done
-		done
 		devices_str=$(IFS=' ' ;echo "${devices[*]}")
 		if ! weka cluster drive add $drive_num $devices_str; then
 			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_num: $devices_str\"}"
@@ -248,7 +240,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		strings.Join(params.IPs, " "),
 		params.ClusterName,
 		params.ClusterizationTarget,
-		params.NvmesNum,
 		params.SetObs,
 		params.SmbwEnabled,
 		params.DataProtection.StripeWidth,

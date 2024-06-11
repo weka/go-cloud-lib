@@ -31,6 +31,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	FRONTEND_CONTAINER_CORES_NUM=%d
 	DRIVE_CONTAINER_CORES_NUM=%d
 	NICS_NUM=%s
+	NVMES_NUM=%d
 	INSTALL_DPDK=%t
 	GATEWAYS="%s"
 
@@ -87,7 +88,6 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 		fi
 	fi
 
-
 	# should not call 'clusterize' until all 2/3 containers are up
 	ready_containers=0
 	while [[ $ready_containers -ne $total_containers ]];
@@ -98,15 +98,29 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	done
 
 	protect "{\"vm\": \"$VM\"}"
+	
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Weka containers are ready\"}"
+
+	mkdir -p /opt/weka/tmp
+	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
+	devices=$(weka local run --container compute0 bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
+	devices=($devices)
+	for (( d=0; d<$NVMES_NUM; d++ )); do
+		while ! lsblk "${devices[$d]}" >/dev/null 2>&1; do
+			echo "waiting for nvme to be ready"
+			sleep 5
+		done
+	done
+
 	clusterize "{\"name\": \"$VM\"}" > /tmp/clusterize.sh
 	chmod +x /tmp/clusterize.sh
 	/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 	`
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
-		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
+		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.NvmesNum, d.Params.InstallDpdk,
 		gateways, clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, d.DeviceNameCmd,
-		bash_functions.GetWekaPartitionScript(), wekaInstallScript,
+		bash_functions.GetWekaPartitionScript(), wekaInstallScript, d.Params.FindDrivesScript,
 	)
 	return dedent.Dedent(script)
 }

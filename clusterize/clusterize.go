@@ -24,7 +24,7 @@ type ClusterParams struct {
 	WekaUsername              string
 	WekaPassword              string
 	SetObs                    bool
-	SmbwEnabled               bool
+	CreateConfigFs            bool
 	ObsScript                 string
 	DataProtection            DataProtectionParams
 	InstallDpdk               bool
@@ -55,7 +55,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	CLUSTER_NAME=%s
 	HOSTS_NUM=%d
 	SET_OBS=%t
-	SMBW_ENABLED=%t
+	CREATE_CONFIG_FS=%t
 	STRIPE_WIDTH=%d
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
@@ -204,8 +204,8 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster container
 	
 	weka fs group create default || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
-	# for SMBW setup we need to create a separate fs with 10GB capacity
-	if [[ $SMBW_ENABLED == true ]]; then
+	# for SMBW and S3 setup we need to create a separate fs with 10GB capacity
+	if [[ $CREATE_CONFIG_FS == true ]]; then
 	    weka fs create .config_fs default 10GB
 	fi
 	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
@@ -241,7 +241,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.ClusterName,
 		params.ClusterizationTarget,
 		params.SetObs,
-		params.SmbwEnabled,
+		params.CreateConfigFs,
 		params.DataProtection.StripeWidth,
 		params.DataProtection.ProtectionLevel,
 		params.DataProtection.Hotspare,

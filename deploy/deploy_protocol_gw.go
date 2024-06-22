@@ -88,9 +88,15 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set value for backend_ip variable
 	set_backend_ip
 	echo "(date -u): backend_ip: $backend_ip"
+	
+	interfaces=$(ls /sys/class/net | grep -v lo | grep -v docker0 | grep -v enP| tail -n+2)
+	read -a interfaces_arr <<< "$interfaces"
+	first_interface=${interfaces_arr[0]}
+	interface_num=$(echo "${first_interface:3}")
+	interface_str=$(echo "${first_interface::-1}")
 
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $(($FRONTEND_CONTAINER_CORES_NUM + 1)) "$GATEWAYS"
+		getNetStrForDpdk $interface_num $(($FRONTEND_CONTAINER_CORES_NUM + $interface_num)) $interface_str "$GATEWAYS"
 	else
 		net=""
 	fi

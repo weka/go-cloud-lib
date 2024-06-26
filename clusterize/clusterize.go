@@ -21,8 +21,6 @@ type ClusterParams struct {
 	ClusterName               string
 	Prefix                    string
 	ClusterizationTarget      int
-	WekaUsername              string
-	WekaPassword              string
 	SetObs                    bool
 	CreateConfigFs            bool
 	ObsScript                 string
@@ -75,10 +73,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	%s
 
 	set +x
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true, \"show_admin_password\": true}")
+	export WEKA_DEPLOYMENT_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_DEPLOYMENT_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_ADMIN_PASSWORD="$(echo $fetch_result | jq -r .admin_password)"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=admin -e WEKA_PASSWORD=$WEKA_ADMIN_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	set -x
 	devices=($devices)
@@ -117,8 +116,14 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 
 	set +x
-	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
-	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD"
+	weka user login admin $WEKA_ADMIN_PASSWORD
+
+	# setup weka deployment user (internal, only used by cloud functions)
+	# weka user add <username> <role> [password]
+	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin $WEKA_DEPLOYMENT_PASSWORD
+	weka user
+
 	set -x
 	
 	# post cluster creation script

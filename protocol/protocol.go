@@ -17,7 +17,8 @@ type HgInstance struct {
 
 type HostGroupInfoResponse struct {
 	Username                     string                `json:"username"`
-	Password                     string                `json:"password"`
+	Password                     string                `json:"password,omitempty"`
+	AdminPassword                string                `json:"admin_password,omitempty"`
 	WekaBackendsDesiredCapacity  int                   `json:"weka_backends_desired_capacity"`
 	NfsBackendsDesiredCapacity   int                   `json:"nfs_backends_desired_capacity"`
 	WekaBackendInstances         []HgInstance          `json:"weka_backend_instances"`
@@ -32,6 +33,7 @@ type HostGroupInfoResponse struct {
 func (hg *HostGroupInfoResponse) WithHiddenPassword() HostGroupInfoResponse {
 	hgCopy := *hg
 	hgCopy.Password = "********"
+	hgCopy.AdminPassword = "********"
 	return hgCopy
 }
 
@@ -155,4 +157,5 @@ type Vm struct {
 
 type FetchRequest struct {
 	FetchWekaCredentials bool `json:"fetch_weka_credentials"`
+	ShowAdminPassword    bool `json:"show_admin_password,omitempty"`
 }

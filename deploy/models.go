@@ -21,8 +21,6 @@ type DeploymentParams struct {
 	FindDrivesScript          string
 	Gateways                  []string
 	Protocol                  protocol.ProtocolGW
-	WekaUsername              string //for protocol gw setup
-	WekaPassword              string //for protocol gw setup
 	NFSInterfaceGroupName     string //for NFS protocol gw setup
 	NFSClientGroupName        string //for NFS protocol gw setup
 	NFSSecondaryIpsNum        int    //for NFS protocol gw setup

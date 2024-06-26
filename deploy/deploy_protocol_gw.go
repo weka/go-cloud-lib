@@ -65,12 +65,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set_backend_ip bash function definition
 	%s
 
-	set +x
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	set -x
-
 	weka local stop
 	weka local rm default --force
 
@@ -84,6 +78,12 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		clusterized=$(status "{\"type\": \"status\"}" | jq .clusterized)
 		echo "Clusterized: $clusterized, going to sleep for 10 seconds"
 	done
+
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	set -x
 
 	# set value for backend_ip variable
 	set_backend_ip

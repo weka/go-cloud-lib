@@ -21,8 +21,10 @@ type ClusterParams struct {
 	ClusterName               string
 	Prefix                    string
 	ClusterizationTarget      int
-	WekaUsername              string
-	WekaPassword              string
+	WekaAdminUsername         string
+	WekaAdminPassword         string
+	WekaDeploymentUsername    string
+	WekaDeploymentPassword    string
 	SetObs                    bool
 	CreateConfigFs            bool
 	ObsScript                 string
@@ -44,7 +46,6 @@ type ClusterizeScriptGenerator struct {
 func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	reportFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	clusterizeFinFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization)
-	fetchFuncDef := c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	params := c.Params
 
 	clusterizeScriptTemplate := `
@@ -63,17 +64,15 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	ADD_FRONTEND=%t
 	PROXY_URL="%s"
 	WEKA_HOME_URL="%s"
+	WEKA_DEPLOYMENT_USERNAME="%s"
+	WEKA_DEPLOYMENT_PASSWORD="%s"
 
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
 
-	# fetch function definition
-	%s
-
 	set +x
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_USERNAME="%s"
+	export WEKA_PASSWORD="%s"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	set -x
@@ -115,6 +114,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	set +x
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
 	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+
+	# setup weka deployment user (internal, only used by cloud functions)
+	# weka user add <username> <role> [password]
+	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin $WEKA_DEPLOYMENT_PASSWORD
+	weka user
+
 	set -x
 	
 	# post cluster creation script
@@ -249,8 +254,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.AddFrontend,
 		params.ProxyUrl,
 		params.WekaHomeUrl,
+		params.WekaDeploymentUsername,
+		params.WekaDeploymentPassword,
 		params.FindDrivesScript,
-		fetchFuncDef,
+		params.WekaAdminUsername,
+		params.WekaAdminPassword,
 		reportFuncDef,
 		clusterizeFinFuncDef,
 		params.PostClusterCreationScript,

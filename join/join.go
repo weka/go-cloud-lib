@@ -15,8 +15,6 @@ import (
 
 type JoinParams struct {
 	IPs            []string
-	WekaUsername   string
-	WekaPassword   string
 	InstallDpdk    bool
 	InstanceParams protocol.BackendCoreCount
 	Gateways       []string
@@ -173,6 +171,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 }
 
 func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Context) string {
+	fetchFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
 	statusFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Status)
@@ -183,10 +182,15 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	bashScriptTemplate := `
 	set -ex
 
-	export WEKA_USERNAME="%s"
-	export WEKA_PASSWORD="%s"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	host_ips="%s"
+
+	# fetch function definition
+	%s
+
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	
 	# report function definition
 	%s
@@ -229,7 +233,7 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
-		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), reportFunc,
+		bashScriptTemplate, strings.Join(ips, " "), fetchFunc, reportFunc,
 		joinFinalizationFunc, statusFunc,
 	)
 	return dedent.Dedent(bashScript)

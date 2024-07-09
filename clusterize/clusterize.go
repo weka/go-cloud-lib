@@ -26,6 +26,8 @@ type ClusterParams struct {
 	SetObs                    bool
 	CreateConfigFs            bool
 	ObsScript                 string
+	TieringTargetSSDRetention int
+	TieringStartDemote        int
 	DataProtection            DataProtectionParams
 	InstallDpdk               bool
 	AddFrontend               bool
@@ -63,6 +65,8 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	ADD_FRONTEND=%t
 	PROXY_URL="%s"
 	WEKA_HOME_URL="%s"
+	TARGET_SSD_RETENTION=%d
+	START_DEMOTE=%d
 
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
@@ -203,7 +207,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster drive
 	weka cluster container
 	
-	weka fs group create default || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
+	weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
 	# for SMBW and S3 setup we need to create a separate fs with 10GB capacity
 	if [[ $CREATE_CONFIG_FS == true ]]; then
 	    weka fs create .config_fs default 10GB
@@ -249,6 +253,8 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.AddFrontend,
 		params.ProxyUrl,
 		params.WekaHomeUrl,
+		params.TieringTargetSSDRetention,
+		params.TieringStartDemote,
 		params.FindDrivesScript,
 		fetchFuncDef,
 		reportFuncDef,

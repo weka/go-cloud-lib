@@ -24,7 +24,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	
 	instance_name="%s"
 	interface_group_name="%s"
-	client_group_name="%s"
 	containersUid=(%s)
 	nic_names=(%s)
 	secondary_ips=(%s)
@@ -147,7 +146,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		configureNFSScriptTemplate,
 		c.Name,
 		c.Params.InterfaceGroupName,
-		c.Params.ClientGroupName,
 		strings.Join(c.Params.ContainersUid, " "),
 		strings.Join(c.Params.NicNames, " "),
 		strings.Join(c.Params.SecondaryIps, " "),

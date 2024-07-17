@@ -22,7 +22,6 @@ type DeploymentParams struct {
 	Gateways                  []string
 	Protocol                  protocol.ProtocolGW
 	NFSInterfaceGroupName     string //for NFS protocol gw setup
-	NFSClientGroupName        string //for NFS protocol gw setup
 	NFSSecondaryIpsNum        int    //for NFS protocol gw setup
 	ProtocolGatewayFeCoresNum int    //for protocol gw setup
 	LoadBalancerIP            string

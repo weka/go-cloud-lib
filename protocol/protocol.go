@@ -141,7 +141,6 @@ const (
 
 type NFSParams struct {
 	InterfaceGroupName string
-	ClientGroupName    string
 	SecondaryIps       []string
 	ContainersUid      []string
 	NicNames           []string

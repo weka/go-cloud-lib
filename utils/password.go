@@ -32,7 +32,7 @@ func GeneratePassword(passwordLength, minLower, minUpper, minNumbers int) string
 
 	// Fill the remaining characters randomly
 	for i := minLower + minUpper + minNumbers; i < passwordLength; i++ {
-		randNum := rng.Intn(4)
+		randNum := rng.Intn(3)
 		switch randNum {
 		case 0:
 			randCharNum := rng.Intn(len(lowerCase))

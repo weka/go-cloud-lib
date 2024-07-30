@@ -187,11 +187,6 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	# fetch function definition
 	%s
 
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
-	
 	# report function definition
 	%s
 
@@ -209,6 +204,11 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 		sleep 5
 		clusterized=$(status | jq .clusterized)
 	done
+
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 
 	mgmt_ip=$(hostname -I | awk '{print $1}')
 

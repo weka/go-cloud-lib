@@ -27,6 +27,8 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	containersUid=(%s)
 	nic_names=(%s)
 	secondary_ips=(%s)
+	get_gateway_cmd="%s"
+	get_subnet_mask_cmd="%s"
 	LOAD_BALANCER_IP="%s"
 
 	# fetch function definition
@@ -58,8 +60,18 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 
 	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
-	gateway=$(ip r | grep default | awk '{print $3}')
-	subnet_mask=$(ifconfig $nic_name | grep 'inet ' | awk '{print $4}')
+	
+	if [ -n "$get_gateway_cmd" ]; then
+		gateway=$($get_gateway_cmd)
+	else
+		gateway=$(ip r | grep default | awk '{print $3}')
+	fi
+
+	if [ -n "$get_subnet_mask_cmd" ]; then
+		subnet_mask=$($get_subnet_mask_cmd)
+	else
+		subnet_mask=$(ifconfig $nic_name | grep 'inet ' | awk '{print $4}')
+	fi
 
 	function create_interface_group() {
 		if weka_rest interfacegroups | grep ${interface_group_name}; then
@@ -149,6 +161,8 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		strings.Join(c.Params.ContainersUid, " "),
 		strings.Join(c.Params.NicNames, " "),
 		strings.Join(c.Params.SecondaryIps, " "),
+		c.Params.GetGatewayCmd,
+		c.Params.GetSubnetMaskCmd,
 		c.LoadBalancerIP,
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Report),

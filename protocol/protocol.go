@@ -145,6 +145,8 @@ type NFSParams struct {
 	ContainersUid      []string
 	NicNames           []string
 	HostsNum           int
+	GetGatewayCmd      string // optional
+	GetSubnetMaskCmd   string // optional
 }
 
 type Vm struct {

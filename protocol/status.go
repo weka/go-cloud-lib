@@ -30,10 +30,11 @@ type ClusterState struct {
 	Progress             map[string][]string `json:"progress"`
 	Errors               map[string][]string `json:"errors"`
 	Debug                map[string][]string `json:"debug"`
-	Instances            []Vm            `json:"instances"`
+	Instances            []Vm                `json:"instances"`
 	Clusterized          bool                `json:"clusterized"`
 	ClusterizationTarget int                 `json:"clusterization_target"`
 	Updates              map[string]Update   `json:"updates,omitempty"`
+	MigrateExisting      bool                `json:"migrate_existing"` // for NFS VMs that were created as separate instances, outside of the instances group
 }
 
 type ClusterStatus struct {

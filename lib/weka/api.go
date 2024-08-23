@@ -57,11 +57,13 @@ type StatusResponse struct {
 }
 
 type Host struct {
+	Uid              string    `json:"uid"`
 	AddedTime        time.Time `json:"added_time"`
 	StateChangedTime time.Time `json:"state_changed_time"`
 	State            string    `json:"state"`
 	Status           string    `json:"status"`
 	HostIp           string    `json:"host_ip"`
+	Hostname         string    `json:"hostname"`
 	Aws              struct {
 		InstanceId string `json:"instance_id"`
 	} `json:"aws"`

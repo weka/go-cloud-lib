@@ -121,11 +121,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	# setup weka deployment user (internal, only used by cloud functions)
 	# weka user add <username> <role> [password]
-	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin $WEKA_DEPLOYMENT_PASSWORD
+	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin "$WEKA_DEPLOYMENT_PASSWORD" || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating deployment user\"}"
 	weka user
-
 	set -x
 	
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Deployment user was created successfully\"}"
 	# post cluster creation script
 	function post_cluster_creation() {
 		echo "running post cluster creation script"

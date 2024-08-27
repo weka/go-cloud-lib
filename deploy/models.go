@@ -64,7 +64,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		TAR_NAME=%s
 		PACKAGE_NAME=%s
 
-		gsutil cp "$INSTALL_URL" /tmp || wget "$INSTALL_URL" -O /tmp/$TAR_NAME
+		gsutil cp "$INSTALL_URL" /tmp || aws s3 cp "$INSTALL_URL" /tmp || wget "$INSTALL_URL" -O /tmp/$TAR_NAME
 		cd /tmp
 		tar -xvf $TAR_NAME
 		cd $PACKAGE_NAME

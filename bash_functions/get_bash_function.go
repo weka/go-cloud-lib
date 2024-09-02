@@ -76,22 +76,23 @@ func GetNetStrForDpdk() string {
 	function getNetStrForDpdk() {
 		i=$1
 		j=$2
-		gateways=$3
+		interface_name=$3
+		gateways=$4
 		gateways=($gateways) #azure and gcp
 
 		net=""
 		for ((i; i<$j; i++)); do
-			eth=eth$i
-			subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
+			interface=$interface_name$i
+			subnet_inet=$(ifconfig $interface | grep 'inet ' | awk '{print $2}')
 			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
-				net="$net --net $eth" #aws
+				net="$net --net $interface" #aws
 				continue
 			fi
-			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
+			enp=$(ls -l /sys/class/net/$interface/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
 			if [ -z $enp ];then
-				enp=$(ethtool -i $eth | grep bus-info | awk '{print $2}') #pci for gcp
+				enp=$(ethtool -i $interface | grep bus-info | awk '{print $2}') #pci for gcp
 			fi
-			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
+			bits=$(ip -o -f inet addr show $interface | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
 			
 			gateway=${gateways[$i]}
@@ -175,5 +176,17 @@ func SetBackendIpFunction() string {
 		fi
 	}
 	`
+	return dedent.Dedent(s)
+}
+
+func GetFirstInterfaceNameAndNumber() string {
+	s := `
+	function getFirstInstanceNameAndNumber {
+		first_interface=$(ls /sys/class/net | grep -vE 'docker|veth|lo' | head -n 1)
+		interface_name=$(echo $first_interface | awk '{gsub(/[0-9]/,"",$1); print $1}')
+		first_interface_number=$(echo $first_interface | grep -o '[0-9]*$')
+	}
+	`
+
 	return dedent.Dedent(s)
 }

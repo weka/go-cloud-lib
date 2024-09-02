@@ -18,6 +18,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
+	getFirstInstanceNameAndNumber := bash_functions.GetFirstInterfaceNameAndNumber()
 	gateways := strings.Join(d.Params.Gateways, " ")
 
 	wekaRestFunc := bash_functions.WekaRestFunction()
@@ -49,6 +50,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	%s
 
 	# getNetStrForDpdk bash function definition
+	%s
+
+	# getFirstInstanceNameAndNumber bash function definition
 	%s
 
 	# deviceNameCmd
@@ -89,8 +93,10 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	set_backend_ip
 	echo "(date -u): backend_ip: $backend_ip"
 
+	getFirstInstanceNameAndNumber
+
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $(($FRONTEND_CONTAINER_CORES_NUM + 1)) "$GATEWAYS"
+		getNetStrForDpdk $(($first_interface_number+1)) $(($FRONTEND_CONTAINER_CORES_NUM+$first_interface_number+1)) $interface_name "$GATEWAYS"
 	else
 		net=""
 	fi
@@ -199,6 +205,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		reportFunc,
 		getCoreIdsFunc,
 		getNetStrForDpdkFunc,
+		getFirstInstanceNameAndNumber,
 		d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(),
 		wekaInstallScript,

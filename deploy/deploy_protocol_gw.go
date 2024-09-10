@@ -96,7 +96,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	getFirstInstanceNameAndNumber
 
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk $(($first_interface_number+1)) $(($FRONTEND_CONTAINER_CORES_NUM+$first_interface_number+1)) $interface_name "$GATEWAYS"
+		getNetStrForDpdk $(($first_interface_number+1)) $(($FRONTEND_CONTAINER_CORES_NUM+$first_interface_number+1)) $interfaces_base_name "$GATEWAYS"
 	else
 		net=""
 	fi

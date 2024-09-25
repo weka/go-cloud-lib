@@ -31,10 +31,8 @@ type JoinScriptGenerator struct {
 }
 
 func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
-	fetchFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
-
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
 	getFirstInstanceNameAndNumber := bash_functions.GetFirstInterfaceNameAndNumber()
@@ -56,9 +54,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 	PROXY_URL="%s"
 
-	# fetch function definition
-	%s
-
 	# report function definition
 	%s
 
@@ -73,14 +68,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	# getFirstInstanceNameAndNumber bash function definition
 	%s
-
-
-	set +x
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
-	set -x
 
 	# deviceNameCmd
 	wekaiosw_device="%s"
@@ -150,11 +137,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	compute := j.Params.InstanceParams.Compute
 	mem := j.Params.InstanceParams.ComputeMemory
 
-	isReady := j.getIsReadyScript()
-	addDrives := j.getAddDrivesScript()
-
 	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
-	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
 		bashScriptTemplate,
 		strings.Join(ips, " "),
@@ -166,7 +149,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		j.Params.InstallDpdk,
 		gateways,
 		j.Params.ProxyUrl,
-		fetchFunc,
 		reportFunc,
 		joinFinalizationFunc,
 		getCoreIdsFunc,
@@ -175,11 +157,16 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		j.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(),
 	)
+
+	setWekaCredentials := j.getWekaCredentialsEnvVarsSetup()
+	isReady := j.getIsReadyScript()
+	addDrives := j.getAddDrivesScript()
+	bashScript += setWekaCredentials + isReady + addDrives
+
 	return dedent.Dedent(bashScript)
 }
 
 func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Context) string {
-	fetchFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
 	statusFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Status)
@@ -191,9 +178,6 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	set -ex
 
 	host_ips="%s"
-
-	# fetch function definition
-	%s
 
 	# report function definition
 	%s
@@ -213,11 +197,6 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 		clusterized=$(status | jq .clusterized)
 	done
 
-	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
-	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
-	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
-	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
-
 	mgmt_ip=$(hostname -I | awk '{print $1}')
 
 	sudo weka local resources management-ips $mgmt_ip -C drives0
@@ -234,17 +213,35 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 		weka local resources apply -f --container frontend0
 	fi
 	`
+	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
+	bashScript := fmt.Sprintf(
+		bashScriptTemplate, strings.Join(ips, " "), reportFunc,
+		joinFinalizationFunc, statusFunc,
+	)
 
+	setWekaCredentials := j.getWekaCredentialsEnvVarsSetup()
 	isReady := j.getIsReadyScript()
 	addDrives := j.getAddDrivesScript()
 
-	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
-	bashScriptTemplate += isReady + addDrives
-	bashScript := fmt.Sprintf(
-		bashScriptTemplate, strings.Join(ips, " "), fetchFunc, reportFunc,
-		joinFinalizationFunc, statusFunc,
-	)
+	bashScript += setWekaCredentials + isReady + addDrives
+
 	return dedent.Dedent(bashScript)
+}
+
+func (j *JoinScriptGenerator) getWekaCredentialsEnvVarsSetup() string {
+	fetchFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
+	s := `
+	# fetch function definition
+	%s
+	
+	set +x
+	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
+	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
+	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	set -x
+	`
+	s = dedent.Dedent(s)
+	return fmt.Sprintf(s, fetchFunc)
 }
 
 func (j *JoinScriptGenerator) getIsReadyScript() string {
@@ -260,6 +257,10 @@ func (j *JoinScriptGenerator) getIsReadyScript() string {
 func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	// supposes 'report' and 'join_finalization' are already defined
 	s := `
+	set +x
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	set -x
+
 	compute_name=$(%s)
 
 	mkdir -p /opt/weka/tmp

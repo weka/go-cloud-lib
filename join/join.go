@@ -207,7 +207,7 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	weka local resources join-ips --container compute0 $host_ips
 	weka local resources apply -f --container compute0
 
-	if [[ $FRONTEND -gt 0 ]]; then
+	if [[ $(weka local ps | grep frontend0) ]]; then
 		sudo weka local resources management-ips $mgmt_ip -C frontend0
 		weka local resources join-ips --container frontend0 $host_ips
 		weka local resources apply -f --container frontend0

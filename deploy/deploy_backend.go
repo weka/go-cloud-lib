@@ -109,6 +109,10 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
+	echo "tifi"
+	weka local run --container compute0 bash -ce 'wapi machine-query-info --info-types=DISKS -J'
+	echo "lsblk"
+	lsblk
 	devices=$(weka local run --container compute0 bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	devices=($devices)
 	for (( d=0; d<$NVMES_NUM; d++ )); do

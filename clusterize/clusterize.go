@@ -71,15 +71,14 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	# fetch function definition
 	%s
-
-	set +x
+	#set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true, \"show_admin_password\": true}")
 	export WEKA_DEPLOYMENT_USERNAME="$(echo $fetch_result | jq -r .username)"
 	export WEKA_DEPLOYMENT_PASSWORD="$(echo $fetch_result | jq -r .password)"
 	export WEKA_ADMIN_PASSWORD="$(echo $fetch_result | jq -r .admin_password)"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=admin -e WEKA_PASSWORD=$WEKA_ADMIN_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
-	set -x
+	#set -x
 	devices=($devices)
 
 	CONTAINER_NAMES=(drives0 compute0)
@@ -136,6 +135,13 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	sleep 30s
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives\"}"
+	for device in "${devices[@]}"; do
+		if sudo dd if="$device" bs=1M count=10 2>/dev/null | strings | grep -q "GRUB"; then
+			# If "GRUB" is found, remove the device from the list
+			echo "Removing $device from list (contains GRUB)"
+			devices=("${devices[@]/$device}")
+		fi
+	done
 
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
 	for drive_num in "${DRIVE_NUMS[@]}"; do

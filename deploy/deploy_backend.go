@@ -118,7 +118,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 		done
 	done
 
-	clusterize "{\"name\": \"$VM\"}" > /tmp/clusterize.sh
+	devices_str=$(printf "\\\"%%s\\\"," "${devices[@]}" | sed 's/,$//')
+
+	clusterize "{\"name\": \"$VM\", \"device_paths\": [$devices_str]}" > /tmp/clusterize.sh
 	chmod +x /tmp/clusterize.sh
 	/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 	`

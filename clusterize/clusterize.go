@@ -35,6 +35,7 @@ type ClusterParams struct {
 	PreStartIoScript          string
 	PostClusterCreationScript string
 	SetDefaultFs              bool
+	PostClusterSetupScript    string
 }
 
 type ClusterizeScriptGenerator struct {
@@ -248,6 +249,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	else
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Skipping OBS setup\"}"
 	fi
+
+	function post_cluster_setup() {
+		echo "running post clusterization script"
+		%s
+	}
+	post_cluster_setup || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed running post cluster setup script\"}"
 	`
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate),
@@ -274,6 +281,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.PostClusterCreationScript,
 		params.PreStartIoScript,
 		params.ObsScript,
+		params.PostClusterSetupScript,
 	)
 	return script
 }

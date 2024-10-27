@@ -34,6 +34,7 @@ type ClusterParams struct {
 	WekaHomeUrl               string
 	PreStartIoScript          string
 	PostClusterCreationScript string
+	SetDefaultFs              bool
 }
 
 type ClusterizeScriptGenerator struct {
@@ -65,6 +66,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	WEKA_HOME_URL="%s"
 	TARGET_SSD_RETENTION=%d
 	START_DEMOTE=%d
+	SET_DEFAULT_FS=%t
 
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
@@ -212,13 +214,17 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster drive
 	weka cluster container
 	
-	weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
-	# for SMBW and S3 setup we need to create a separate fs with 10GB capacity
-	if [[ $CREATE_CONFIG_FS == true ]]; then
-	    weka fs create .config_fs default 10GB
+	if [[ $SET_DEFAULT_FS == true ]]; then
+		weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
+		# for SMBW and S3 setup we need to create a separate fs with 10GB capacity
+		if [[ $CREATE_CONFIG_FS == true ]]; then
+			weka fs create .config_fs default 10GB
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"FS '.config_fs' was created successfully\"}"
+		fi
+		full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
+		weka fs create default default "$full_capacity"B
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Default FS was created successfully\"}"
 	fi
-	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
-	weka fs create default default "$full_capacity"B
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		weka alerts mute NodeRDMANotActive 365d
@@ -260,6 +266,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.WekaHomeUrl,
 		params.TieringTargetSSDRetention,
 		params.TieringStartDemote,
+		params.SetDefaultFs,
 		params.FindDrivesScript,
 		fetchFuncDef,
 		reportFuncDef,

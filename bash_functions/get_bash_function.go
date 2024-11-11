@@ -48,10 +48,9 @@ func GetCoreIds() string {
 	get_core_ids() {
 		core_idx_end=$(($core_idx_begin + $1))
 		if [[ ${numa_num} > 1 ]]; then
-			index=$((i%2))
+			index=$((core_idx_begin%2))
 			core_ids=(${numa[$index]})
-			index_in_numa=$((core_idx_begin/2))
-			res=${core_ids["$index_in_numa"]}
+			res=${core_ids[$((core_idx_begin/2))]}
 			for (( i=$(($core_idx_begin+1)); i<$core_idx_end; i++ )); do
 				index=$(($i%2))
 				core_ids=(${numa[$index]})

@@ -98,7 +98,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	}
 
 	function wait_for_nfs_interface_group(){
-	  max_retries=12 # 12 * 10 = 2 minutes
+	  max_retries=60 # 60 * 10 = 10 minutes
 	  for ((i=0; i<max_retries; i++)); do
 		status=$(weka_rest interfacegroups | jq .data | jq -r '.[] | select(.name == "'${interface_group_name}'").status')
 		if [ "$status" == "OK" ]; then
@@ -110,6 +110,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	  done
 	  if [ "$status" != "OK" ]; then
 		echo "$(date -u): failed to wait for the interface group status to be OK"
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"error\", \"message\": \"NFS interface group status is not OK after 10 minutes\"}"
 		return 1
 	  fi
 	}

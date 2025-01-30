@@ -250,11 +250,19 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Skipping OBS setup\"}"
 	fi
 
-	function post_cluster_setup() {
+	post_cluster_setup_script="%s"
+	if [ -n "$post_cluster_setup_script" ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running post cluster setup script\"}"
+		post_cluster_setup_script_path=/tmp/weka_post_cluster_setup_script.sh
+		echo "$post_cluster_setup_script" > "$post_cluster_setup_script_path"
+		chmod +x "$post_cluster_setup_script_path"
 		echo "running post clusterization script"
-		%s
-	}
-	post_cluster_setup || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed running post cluster setup script\"}"
+		if "$post_cluster_setup_script_path"; then
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running post cluster setup script completed successfully\"}"
+		else
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Running post cluster setup script failed\"}"
+		fi
+	fi
 	`
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate),

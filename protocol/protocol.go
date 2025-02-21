@@ -154,6 +154,7 @@ type Vm struct {
 	Protocol     ProtocolGW `json:"protocol"`
 	ContainerUid string     `json:"container_uid"` // protocol frontend container uid
 	NicName      string     `json:"nic_name"`      // protocol management nic name
+	DevicePaths  []string   `json:"device_paths"`  // drives to be added to weka on clusterization
 }
 
 type FetchRequest struct {

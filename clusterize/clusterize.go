@@ -17,6 +17,7 @@ type DataProtectionParams struct {
 
 type ClusterParams struct {
 	VMNames                   []string
+	VMNamesToDevicePaths      []string
 	IPs                       []string
 	ClusterName               string
 	Prefix                    string
@@ -53,6 +54,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	#!/bin/bash
 	set -ex
 	VMS=(%s)
+	VMS_TO_DEVICE_PATHS=(%s)
 	IPS=(%s)
 	CLUSTER_NAME=%s
 	HOSTS_NUM=%d
@@ -81,9 +83,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	export WEKA_DEPLOYMENT_PASSWORD="$(echo $fetch_result | jq -r .password)"
 	export WEKA_ADMIN_PASSWORD="$(echo $fetch_result | jq -r .admin_password)"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=admin -e WEKA_PASSWORD=$WEKA_ADMIN_PASSWORD"
-	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	set -x
-	devices=($devices)
 
 	CONTAINER_NAMES=(drives0 compute0)
 	PORTS=(14000 15000)
@@ -141,16 +141,29 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives\"}"
 
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
-	for drive_num in "${DRIVE_NUMS[@]}"; do
+	for drive_container_id in "${DRIVE_NUMS[@]}"; do
+		drive_container_hostname=( $(weka cluster container $drive_container_id | grep drives | awk '{print $2;}') )
+		echo "Processing container $drive_container_id with hostname $drive_container_hostname"
+
+		devices=()
+		# ------- VMS_TO_DEVICE_PATHS has the format: "drive_container_hostname:dev1,dev2,dev3" -------
+		for v in "${VMS_TO_DEVICE_PATHS[@]}"; do
+			# ------- if v contains 'drive_container_hostname', then get the devices------
+			if [[ $v == *"$drive_container_hostname"* ]]; then
+				devices=( $(echo $v | cut -d':' -f2 | tr ',' ' ') )
+			fi
+		done
+		echo "Adding drives ${devices[*]} to container $drive_container_id"
+
 		bad_drives=false
 		devices_str=$(IFS=' ' ;echo "${devices[*]}")
-		if ! weka cluster drive add $drive_num $devices_str; then
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_num: $devices_str\"}"
+		if ! weka cluster drive add $drive_container_id $devices_str; then
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_container_id: $devices_str\"}"
 			bad_drives=true
 		fi
 
 		if [ $bad_drives = true ]; then
-			weka_hostname=$(weka cluster container -c $drive_num | tail -n +2 | awk '{print $2}')
+			weka_hostname=$(weka cluster container -c $drive_container_id | tail -n +2 | awk '{print $2}')
 			containers=($(weka cluster container | grep $weka_hostname | awk '{print $1}'))
 			for c in "${containers[@]}"
 			do
@@ -173,7 +186,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 				done
 			done
 
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Removing drives: $drive_num\"}"
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Removing drives: $drive_container_id\"}"
 			drives=($(weka cluster drive | grep $weka_hostname | awk '{print $2}'))
 			for d in "${drives[@]}"
 			do
@@ -267,6 +280,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	script := fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate),
 		strings.Join(params.VMNames, " "),
+		strings.Join(params.VMNamesToDevicePaths, " "),
 		strings.Join(params.IPs, " "),
 		params.ClusterName,
 		params.ClusterizationTarget,

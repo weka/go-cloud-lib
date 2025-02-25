@@ -141,9 +141,11 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives\"}"
 
 	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
-	for drive_num in "${DRIVE_NUMS[@]}"; do
+	devices_str=$(IFS=' ' ;echo "${devices[*]}")
+
+	function add_drives() {
 		bad_drives=false
-		devices_str=$(IFS=' ' ;echo "${devices[*]}")
+		drive_num=$1
 		if ! weka cluster drive add $drive_num $devices_str; then
 			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_num: $devices_str\"}"
 			bad_drives=true
@@ -180,8 +182,13 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 				weka cluster drive remove $d -f || true
 			done
 		fi
+	}
 
+	for drive_container_id in "${DRIVE_NUMS[@]}"; do
+		add_drives $drive_container_id &
+		sleep 0.1 # give some time between drives additions to allow first drives additions to complete
 	done
+	wait
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
 

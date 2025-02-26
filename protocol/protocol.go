@@ -137,6 +137,7 @@ const (
 	SMB  ProtocolGW = "smb"
 	SMBW ProtocolGW = "smbw"
 	S3   ProtocolGW = "s3"
+	DATA ProtocolGW = "data"
 )
 
 type NFSParams struct {

@@ -57,7 +57,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	CLUSTER_NAME=%s
 	HOSTS_NUM=%d
 	SET_OBS=%t
-	CREATE_CONFIG_FS=%t
 	STRIPE_WIDTH=%d
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
@@ -222,13 +221,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster drive
 	weka cluster container
 	
+	weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
+	weka fs create .config_fs default 22GB
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"FS '.config_fs' was created successfully\"}"
+	weka dataservice global-config set --config-fs .config_fs
+
 	if [[ $SET_DEFAULT_FS == true ]]; then
-		weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
-		# for SMBW and S3 setup we need to create a separate fs with 10GB capacity
-		if [[ $CREATE_CONFIG_FS == true ]]; then
-			weka fs create .config_fs default 10GB
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"FS '.config_fs' was created successfully\"}"
-		fi
 		full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
 		weka fs create default default "$full_capacity"B
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Default FS was created successfully\"}"
@@ -278,7 +276,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.ClusterName,
 		params.ClusterizationTarget,
 		params.SetObs,
-		params.CreateConfigFs,
 		params.DataProtection.StripeWidth,
 		params.DataProtection.ProtectionLevel,
 		params.DataProtection.Hotspare,

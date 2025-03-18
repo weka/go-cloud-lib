@@ -224,7 +224,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
 	weka fs create .config_fs default 22GB
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"FS '.config_fs' was created successfully\"}"
-	weka dataservice global-config set --config-fs .config_fs
+	#weka dataservice global-config set --config-fs .config_fs
 
 	if [[ $SET_DEFAULT_FS == true ]]; then
 		full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)

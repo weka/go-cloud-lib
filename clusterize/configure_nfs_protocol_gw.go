@@ -48,6 +48,9 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# weka rest function definition (requires $backend_ip var to be set)
 	%s
 
+	# set current management ip
+	%s
+
 	nfs_count=${#containersUid[@]}
 
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"This ($instance_name) is nfs instance $nfs_count/$nfs_count that is ready for joining the interface group\"}"
@@ -58,7 +61,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	export WEKA_PASSWORD="$(echo $fetch_result | jq -r .password)"
 	set -x
 
-	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
 	
 	if [ -z "$gateway" ]; then
@@ -166,6 +168,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization),
 		bash_functions.SetBackendIpFunction(),
 		bash_functions.WekaRestFunction(),
+		bash_functions.SetCurrentManagementIp(),
 	)
 
 	return dedent.Dedent(nfsSetupScript)

@@ -102,6 +102,14 @@ func GetNetStrForDpdk() string {
 	return dedent.Dedent(s)
 }
 
+func SetCurrentManagementIp() string {
+	s := `
+	first_interface_name=$(ls /sys/class/net | grep -vE 'docker|veth|lo|enP|dtap' | sort --version-sort | head -n 1)
+	current_mngmnt_ip=$(ip -4 addr show $first_interface_name | grep inet | awk '{print $2}' | cut -d/ -f1)
+	`
+	return dedent.Dedent(s)
+}
+
 func GetHashedPrivateIpBashCmd() string {
 	return "printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16"
 }

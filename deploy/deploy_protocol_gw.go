@@ -68,6 +68,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	# set_backend_ip bash function definition
 	%s
+	# set current management ip
+	%s
 
 	weka local stop
 	weka local rm default --force
@@ -133,7 +135,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	ip -o -4 addr show
 
-	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
 
 	echo "$(date -u): starting preparation for protocol setup"
@@ -189,6 +190,68 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	fi
 
 	echo "$(date -u): finished preparation for protocol setup"
+
+	echo "$(date -u): running validation for setting protocol script"
+	config_filesystem_name=".config_fs"
+	function wait_for_config_fs(){
+	  max_retries=30 # 30 * 10 = 5 minutes
+	  for (( i=0; i < max_retries; i++ )); do
+		if [ "$(weka fs | grep -c $config_filesystem_name)" -ge 1 ]; then
+		  echo "$(date -u): weka filesystem $config_filesystem_name is up"
+		  break
+		fi
+		echo "$(date -u): waiting for weka filesystem $config_filesystem_name to be up"
+		sleep 10
+	  done
+	  if (( i > max_retries )); then
+		  err_msg="timeout: weka filesystem $config_filesystem_name is not up after $max_retries attempts."
+		  echo "$(date -u): $err_msg"
+		  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+		  return 1
+	  fi
+	}
+
+	# make sure weka cluster is already up
+	max_retries=60
+	for (( i=0; i < max_retries; i++ )); do
+	  if [ $(weka status | grep 'status: OK' | wc -l) -ge 1 ]; then
+		echo "$(date -u): weka cluster is up"
+		break
+	  fi
+	  echo "$(date -u): waiting for weka cluster to be up"
+	  sleep 30
+	done
+	if (( i > max_retries )); then
+		err_msg="timeout: weka cluster is not up after $max_retries attempts."
+		echo "$(date -u): $err_msg"
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+		exit 1
+	fi
+
+	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
+	# get container id
+	for ((i=0; i<20; i++)); do
+	  container_id=$(weka cluster container | grep frontend0 | grep "$HOSTNAME" | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
+	  if [ -n "$container_id" ]; then
+		  echo "$(date -u): frontend0 container id: $container_id"
+		  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
+		  break
+	  fi
+	  echo "$(date -u): waiting for frontend0 container to be up"
+	  sleep 5
+	done
+
+	if [ -z "$container_id" ]; then
+	  err_msg="Failed to get the frontend0 container ID."
+	  echo "$(date -u): $err_msg"
+	  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+	  exit 1
+	fi
+
+	# if protocol isn't NFS, wait for the config filesystem to be up
+	if [ "$PROTOCOL" != "nfs" ]; then
+		wait_for_config_fs
+	fi
 	`
 	script := fmt.Sprintf(
 		template,
@@ -211,6 +274,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		wekaInstallScript,
 		wekaRestFunc,
 		setBackendIpFunc,
+		bash_functions.SetCurrentManagementIp(),
 		d.Params.GetPrimaryIpCmd,
 	)
 	return dedent.Dedent(script)

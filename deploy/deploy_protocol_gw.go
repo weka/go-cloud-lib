@@ -228,7 +228,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		exit 1
 	fi
 
-	current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
 	# get container id
 	for ((i=0; i<20; i++)); do
 	  container_id=$(weka cluster container | grep frontend0 | grep "$HOSTNAME" | grep $current_mngmnt_ip | grep UP | awk '{print $1}')

@@ -99,7 +99,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	curl $backend_ip:14000/dist/v1/install -o install.sh
 	chmod +x install.sh
 	PROXY="$PROXY_URL" ./install.sh
-	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"WEKA software installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
 	weka version prepare $VERSION
@@ -234,6 +234,8 @@ func (j *JoinScriptGenerator) getWekaCredentialsEnvVarsSetup() string {
 	# fetch function definition
 	%s
 	
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Fetching WEKA credentials\"}"
+
 	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true}")
 	export WEKA_USERNAME="$(echo $fetch_result | jq -r .username)"
@@ -246,6 +248,8 @@ func (j *JoinScriptGenerator) getWekaCredentialsEnvVarsSetup() string {
 
 func (j *JoinScriptGenerator) getIsReadyScript() string {
 	s := `
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Waiting for WEKA cluster to be ready\"}"
+
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
 		sleep 1
 	done
@@ -261,6 +265,8 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	set -x
 
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives to WEKA cluster\"}"
+
 	compute_name=$(%s)
 
 	mkdir -p /opt/weka/tmp
@@ -271,6 +277,8 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	set -x
+
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Signing drives\"}"
 	for device in $devices; do
 		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
 	done
@@ -286,6 +294,8 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 			fi
 		done
 	done
+
+	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running drives scan\"}"
 	weka cluster drive scan $host_id
 
 	weka events trigger-event "Scale up operation completed on host $HOSTNAME, data redistribution may still be running"

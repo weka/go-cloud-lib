@@ -123,8 +123,9 @@ func GetWekaPartitionScript() string {
 		exit 1
 	fi
 	}
-
 	if [ ! -z "$wekaiosw_device" ]; then
+		df -h
+		mount
 		echo "--------------------------------------------"
 		echo " Creating local filesystem on WekaIO volume "
 		echo "--------------------------------------------"
@@ -135,6 +136,8 @@ func GetWekaPartitionScript() string {
 		mkdir -p /opt/weka || handle_error $? "Failed to create /opt/weka directory"
 		mount "$wekaiosw_device" /opt/weka || handle_error $? "Failed to mount WekaIO volume"
 		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
+		df -h
+		mount
 	fi`
 	return dedent.Dedent(s)
 }

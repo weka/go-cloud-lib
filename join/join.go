@@ -296,7 +296,24 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	done
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running drives scan\"}"
-	weka cluster drive scan $host_id
+
+	count=1
+	while ! weka cluster drive scan "$host_id"; do
+		count=$((count+1))
+		if [ "$count" -gt 60 ]; then
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to run drives scan\"}"
+			containers=($(weka cluster container | grep "$HOSTNAME" | awk '{print $1}'))
+			for c in "${containers[@]}"
+			do
+				report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"
+				weka cluster container deactivate $c || true
+			done
+			exit 1
+		fi
+		sleep 1
+		echo "Retrying drives scan, try: $count/60"
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Retrying drives scan\"}"
+	done
 
 	weka events trigger-event "Scale up operation completed on host $HOSTNAME, data redistribution may still be running"
 

@@ -206,7 +206,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	  if (( i > max_retries )); then
 		  err_msg="timeout: weka filesystem $config_filesystem_name is not up after $max_retries attempts."
 		  echo "$(date -u): $err_msg"
-		  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+		  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$err_msg\"}"
 		  return 1
 	  fi
 	}
@@ -224,7 +224,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	if (( i > max_retries )); then
 		err_msg="timeout: weka cluster is not up after $max_retries attempts."
 		echo "$(date -u): $err_msg"
-		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$err_msg\"}"
 		exit 1
 	fi
 
@@ -233,7 +233,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	  container_id=$(weka cluster container | grep frontend0 | grep "$HOSTNAME" | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
 	  if [ -n "$container_id" ]; then
 		  echo "$(date -u): frontend0 container id: $container_id"
-		  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
+		  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
 		  break
 	  fi
 	  echo "$(date -u): waiting for frontend0 container to be up"
@@ -243,7 +243,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	if [ -z "$container_id" ]; then
 	  err_msg="Failed to get the frontend0 container ID."
 	  echo "$(date -u): $err_msg"
-	  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+	  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$err_msg\"}"
 	  exit 1
 	fi
 

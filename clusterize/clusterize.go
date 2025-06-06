@@ -74,14 +74,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	# fetch function definition
 	%s
 
-	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true, \"show_admin_password\": true}")
 	export WEKA_DEPLOYMENT_USERNAME="$(echo $fetch_result | jq -r .username)"
 	export WEKA_DEPLOYMENT_PASSWORD="$(echo $fetch_result | jq -r .password)"
 	export WEKA_ADMIN_PASSWORD="$(echo $fetch_result | jq -r .admin_password)"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=admin -e WEKA_PASSWORD=$WEKA_ADMIN_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
-	set -x
 	devices=($devices)
 
 	CONTAINER_NAMES=(drives0 compute0)
@@ -117,7 +115,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 
-	set +x
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD"
 	weka user login admin $WEKA_ADMIN_PASSWORD
 
@@ -125,7 +122,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	# weka user add <username> <role> [password]
 	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin "$WEKA_DEPLOYMENT_PASSWORD" || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating deployment user\"}"
 	weka user
-	set -x
 	
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Deployment user was created successfully\"}"
 	# post cluster creation script

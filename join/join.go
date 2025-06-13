@@ -79,7 +79,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	random=$$
 	echo $random
 	for backend_ip in ${IPS[@]}; do
-		if VERSION=$(curl -s -XPOST --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' $backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
+		if VERSION=$(curl -s -XPOST --insecure --data '{"jsonrpc":"2.0", "method":"client_query_backend", "id":"'$random'"}' https://$backend_ip:14000/api/v1 | sed  's/.*"software_release":"\([^"]*\)".*$/\1/g'); then
 			if [[ "$VERSION" != "" ]]; then
 				break
 			fi
@@ -96,7 +96,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	done
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-	curl $backend_ip:14000/dist/v1/install -o install.sh
+	curl --insecure https://$backend_ip:14000/dist/v1/install -o install.sh
 	chmod +x install.sh
 	PROXY="$PROXY_URL" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"WEKA software installation completed\"}"

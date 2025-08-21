@@ -71,6 +71,27 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set current management ip
 	%s
 
+	function retry_command {
+		retry_max=60
+		retry_sleep=30
+		count=$retry_max
+		command=$1
+		msg=$2
+		
+		while [ $count -gt 0 ]; do
+			$command && break
+			count=$(($count - 1))
+			echo "Retrying $msg in $retry_sleep seconds..."
+			sleep $retry_sleep
+		done
+		[ $count -eq 0 ] && {
+			echo "$msg failed after $retry_max attempts"
+			echo "$(date -u):$msg failed"
+			return 1
+		}
+		return 0
+	}
+
 	weka local stop
 	weka local rm default --force
 
@@ -111,8 +132,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		join_ips=$LOAD_BALANCER_IP
 	fi
 
-	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips
-	
+	setup_frontend_cmd="weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips"
+	retry_command "$setup_frontend_cmd" "weka frontend setup"
+
 	echo "$(date -u): success to run weka frontend container"
 
 	ready_containers=0
@@ -128,7 +150,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	protect "{\"vm\": \"$VM\", \"protocol\": \"$PROTOCOL\"}"
 	set +x
 	echo "$(date -u): try to run weka login command"
-	weka user login $WEKA_USERNAME $WEKA_PASSWORD
+
+	retry_command "weka user login $WEKA_USERNAME $WEKA_PASSWORD" "weka login"
+
 	echo "$(date -u): success to run weka login command"
 	set -x
 	weka local ps

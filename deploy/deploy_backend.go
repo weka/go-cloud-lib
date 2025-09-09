@@ -73,14 +73,16 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 
 	getFirstInstanceNameAndNumber
 
+	management_ip=$(ifconfig eth0 | grep "prefixlen 128" | awk '{print $2}')
+
 	if [[ $INSTALL_DPDK == true ]]; then
 		getNetStrForDpdk $(($first_interface_number+1)) $(($DRIVE_CONTAINER_CORES_NUM+$first_interface_number+1)) $interfaces_base_name "$GATEWAYS"
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate $net
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate $net --management-ips $management_ip
 		getNetStrForDpdk $(($first_interface_number+1+$DRIVE_CONTAINER_CORES_NUM)) $(($first_interface_number+1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $interfaces_base_name "$GATEWAYS"
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate $net
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate $net --management-ips $management_ip
 	else
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate --net udp
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate --net udp
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate --net udp --management-ips $management_ip
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate --net udp --management-ips $management_ip
 	fi
 
 	if [[ $FRONTEND_CONTAINER_CORES_NUM -gt 0 ]]; then
@@ -88,9 +90,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 		get_core_ids $FRONTEND_CONTAINER_CORES_NUM frontend_core_ids
 		if [[ $INSTALL_DPDK == true ]]; then
 			getNetStrForDpdk $(($first_interface_number+1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $(($first_interface_number+$NICS_NUM)) $interfaces_base_name "$GATEWAYS" "$SUBNETS"
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate $net
+			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate $net --management-ips $management_ip
 		else
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate --net udp
+			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate --net udp --management-ips $management_ip
 		fi
 	fi
 

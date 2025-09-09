@@ -106,7 +106,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	HOST_NAMES=()
 	for i in "${!IPS[@]}"; do
 		for j in "${!PORTS[@]}"; do
-			HOST_IPS+=($(echo "${IPS[i]}:${PORTS[j]}"))
+			HOST_IPS+=($(echo "[${IPS[i]}]:${PORTS[j]}"))
 			HOST_NAMES+=($(echo "${VMS[i]}-${CONTAINER_NAMES[j]}"))
 		done
 	done

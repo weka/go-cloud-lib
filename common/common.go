@@ -60,3 +60,10 @@ func IsItemInList(item string, list []string) bool {
 	}
 	return false
 }
+
+func GetInstancesNames(instances []protocol.Vm) (vmNames []string) {
+	for _, instance := range instances {
+		vmNames = append(vmNames, instance.Name)
+	}
+	return
+}

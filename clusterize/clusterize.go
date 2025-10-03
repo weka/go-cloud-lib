@@ -76,9 +76,25 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	set +x
 	fetch_result=$(fetch "{\"fetch_weka_credentials\": true, \"show_admin_password\": true}")
+	if [ -z "$fetch_result" ] || [ "$fetch_result" == "null" ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed fetching weka credentials\"}"
+		exit 1
+	fi
 	export WEKA_DEPLOYMENT_USERNAME="$(echo $fetch_result | jq -r .username)"
+	if [ -z "$WEKA_DEPLOYMENT_USERNAME" ] || [ "$WEKA_DEPLOYMENT_USERNAME" == "null" ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed fetching deployment username\"}"
+		exit 1
+	fi
 	export WEKA_DEPLOYMENT_PASSWORD="$(echo $fetch_result | jq -r .password)"
+	if [ -z "$WEKA_DEPLOYMENT_PASSWORD" ] || [ "$WEKA_DEPLOYMENT_PASSWORD" == "null" ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed fetching deployment password\"}"
+		exit 1
+	fi
 	export WEKA_ADMIN_PASSWORD="$(echo $fetch_result | jq -r .admin_password)"
+	if [ -z "$WEKA_ADMIN_PASSWORD" ] || [ "$WEKA_ADMIN_PASSWORD" == "null" ]; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed fetching admin password\"}"
+		exit 1
+	fi
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=admin -e WEKA_PASSWORD=$WEKA_ADMIN_PASSWORD"
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	set -x
@@ -118,7 +134,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 
 	set +x
-	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD"
+	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating cluster\"}" && exit 1)
 	weka user login admin $WEKA_ADMIN_PASSWORD
 
 	# setup weka deployment user (internal, only used by cloud functions)

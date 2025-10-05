@@ -19,6 +19,7 @@ type JoinParams struct {
 	InstanceParams protocol.BackendCoreCount
 	Gateways       []string
 	ProxyUrl       string
+	CgroupsMode    string
 }
 
 type JoinScriptGenerator struct {
@@ -42,6 +43,11 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	ips := j.Params.IPs
 	common.ShuffleSlice(ips)
 
+	cgroupsMode := "auto"
+	if j.Params.CgroupsMode != "" {
+		cgroupsMode = j.Params.CgroupsMode
+	}
+
 	bashScriptTemplate := `
 	IPS=(%s)
 	HASHED_IP=$(%s)
@@ -53,6 +59,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	GATEWAYS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 	PROXY_URL="%s"
+	WEKA_CGROUPS_MODE="%s"
 
 	# report function definition
 	%s
@@ -98,7 +105,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl --insecure https://$backend_ip:14000/dist/v1/install -o install.sh
 	chmod +x install.sh
-	PROXY="$PROXY_URL" ./install.sh
+	PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"WEKA software installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
@@ -149,6 +156,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		j.Params.InstallDpdk,
 		gateways,
 		j.Params.ProxyUrl,
+		cgroupsMode,
 		reportFunc,
 		joinFinalizationFunc,
 		getCoreIdsFunc,

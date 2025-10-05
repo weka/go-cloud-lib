@@ -26,6 +26,7 @@ type DeploymentParams struct {
 	ProtocolGatewayFeCoresNum int    //for protocol gw setup
 	LoadBalancerIP            string
 	GetPrimaryIpCmd           string
+	CgroupsMode               string
 }
 
 type DeployScriptGenerator struct {
@@ -45,7 +46,14 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	INSTALL_URL="%s"
 	PROXY_URL="%s"
 	PROTOCOL="%s"
+	WEKA_CGROUPS_MODE="%s"
 	`
+
+	cgroupsMode := "auto"
+	if d.Params.CgroupsMode != "" && d.Params.Protocol == "" {
+		cgroupsMode = d.Params.CgroupsMode
+	}
+
 	installScript := fmt.Sprintf(
 		installScriptTemplate,
 		reportFuncDef,
@@ -53,6 +61,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		installUrl,
 		d.Params.ProxyUrl,
 		d.Params.Protocol,
+		cgroupsMode,
 	)
 
 	if strings.HasSuffix(installUrl, ".tar") || strings.Contains(installUrl, ".tar?") {
@@ -107,7 +116,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		sed -i -e 's/--noproxy \".amazonaws.com\"//g' ./install.sh
 		sed -i '/no_proxy/d' install.sh
 	fi
-	PROXY="$PROXY_URL" ./install.sh
+	PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 	`
 

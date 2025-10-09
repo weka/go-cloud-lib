@@ -275,6 +275,11 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 func removeInactive(ctx context.Context, inactiveMachines map[string][]hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
 	logger := logging.LoggerFromCtx(ctx)
 	for hostIp, machineHosts := range inactiveMachines {
+		_ = weka_events.EmitCustomEventUsingJPool(
+			ctx,
+			fmt.Sprintf("Trying to remove machine %s. reason: %s", hostIp, InactiveMachineEvent),
+			jpool,
+		)
 		jpool.Drop(hostIp)
 		for _, host := range machineHosts {
 			if host.State != "INACTIVE" {
@@ -431,16 +436,6 @@ func deactivateMachine(ctx context.Context, jpool *jrpc.Pool, machineHosts []hos
 		}
 	}
 
-	// send weka event
-	if eventParams.reason == ScaleDownEvent {
-		message := fmt.Sprintf(
-			"Trying to deactivate Down %s %s",
-			machineTxt,
-			machineHosts[0].HostIp,
-		)
-
-		_ = weka_events.EmitCustomEventUsingJPool(ctx, message, jpool)
-	}
 	message := fmt.Sprintf(
 		"Trying to deactivate %s %s. Desired size: %d, current size: %d, reason: %s.",
 		machineTxt,
@@ -927,15 +922,15 @@ func handleLeftOverHosts(ctx context.Context, jpool *jrpc.Pool, instances []prot
 			logger.Warn().Msgf("host %s:%s is active and does not belong to HG", host.HostIp, host.id)
 		}
 	}
+
 	removeInactive(ctx, inactiveMachines, jpool, instances, response)
+
 	eventParams := deactivateEventInfo{
 		currentSize: desiredCapacity,
 		desiredSize: desiredCapacity,
-		reason:      InactiveMachineEvent,
+		reason:      DownMachineEvent,
 	}
-
 	for _, hostIp := range downMachines {
-		eventParams.reason = DownMachineEvent
 		deactivateMachine(ctx, jpool, machineToHostMap[hostIp], response, &eventParams, nfsHostsMap)
 	}
 

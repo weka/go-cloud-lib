@@ -68,7 +68,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	fi
 
 	if [ -z "$subnet_mask" ]; then
-		subnet_mask=$(ifconfig $nic_name | grep 'inet ' | awk '{print $4}')
+		subnet_mask=$(ip -4 addr show $nic_name | grep inet | awk '{print $2}' | cut -d/ -f2)
 	fi
 
 	function create_interface_group() {

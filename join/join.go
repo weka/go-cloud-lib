@@ -37,6 +37,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
 	getFirstInstanceNameAndNumber := bash_functions.GetFirstInterfaceNameAndNumber()
+	waitForInterfaceIp := bash_functions.WaitForInterfaceIp()
 	gateways := strings.Join(j.Params.Gateways, " ")
 	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
@@ -76,6 +77,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	# getFirstInstanceNameAndNumber bash function definition
 	%s
 
+	# waitForInterfaceIp bash function definition
+	%s
+
 	# deviceNameCmd
 	wekaiosw_device="%s"
 	# wekio partition setup
@@ -95,12 +99,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	getFirstInstanceNameAndNumber
 
-	while true ; do
-		if [[ $(ip -4 addr show $first_interface_name | grep inet | awk '{print $2}' | cut -d/ -f1) ]]; then
-			break
-		fi
-		sleep 1
-	done
+	waitForInterfaceIp $first_interface_name
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl --insecure https://$backend_ip:14000/dist/v1/install -o install.sh
@@ -162,6 +161,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		getCoreIdsFunc,
 		getNetStrForDpdkFunc,
 		getFirstInstanceNameAndNumber,
+		waitForInterfaceIp,
 		j.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(),
 	)

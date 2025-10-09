@@ -19,6 +19,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	getCoreIdsFunc := bash_functions.GetCoreIds()
 	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
 	getFirstInstanceNameAndNumber := bash_functions.GetFirstInterfaceNameAndNumber()
+	waitForInterfaceIp := bash_functions.WaitForInterfaceIp()
 	gateways := strings.Join(d.Params.Gateways, " ")
 	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
@@ -54,6 +55,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	# getFirstInstanceNameAndNumber bash function definition
 	%s
 
+	# waitForInterfaceIp bash function definition
+	%s
+
 	# deviceNameCmd
 	wekaiosw_device="%s"
 	# wekio partition setup
@@ -72,6 +76,8 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	total_containers=2
 
 	getFirstInstanceNameAndNumber
+
+	waitForInterfaceIp $first_interface_name
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		getNetStrForDpdk $(($first_interface_number+1)) $(($DRIVE_CONTAINER_CORES_NUM+$first_interface_number+1)) $interfaces_base_name "$GATEWAYS"
@@ -125,7 +131,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.NvmesNum, d.Params.InstallDpdk,
-		gateways, clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getFirstInstanceNameAndNumber, d.DeviceNameCmd,
+		gateways, clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getFirstInstanceNameAndNumber, waitForInterfaceIp, d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(), wekaInstallScript, d.Params.FindDrivesScript,
 	)
 	return dedent.Dedent(script)

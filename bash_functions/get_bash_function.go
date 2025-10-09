@@ -197,3 +197,16 @@ func GetFirstInterfaceNameAndNumber() string {
 
 	return dedent.Dedent(s)
 }
+
+func WaitForInterfaceIp() string {
+	s := `
+	function waitForInterfaceIp {
+		interface_name=$1
+		while ! ip -4 addr show $interface_name | grep -q inet; do
+			sleep 1
+		done
+	}
+	`
+
+	return dedent.Dedent(s)
+}

@@ -159,7 +159,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	fi
 
 	# get real primary ip from cloud metadata
-	# NOTE: in Azure there are situations where the primary ip is not shown as primary in ifconfig
+	# NOTE: in Azure there are situations where the primary ip is not shown as primary in ip addr
 	primary_ip_cmd="%s"
 	if [ -n "$primary_ip_cmd" ]; then
 		primary_ip=$(eval $primary_ip_cmd)

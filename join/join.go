@@ -96,7 +96,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	getFirstInstanceNameAndNumber
 
 	while true ; do
-		if [[ $(ifconfig $first_interface_name | grep "inet " | awk '{ print $2}') ]]; then
+		if [[ $(ip -4 addr show $first_interface_name | grep inet | awk '{print $2}' | cut -d/ -f1) ]]; then
 			break
 		fi
 		sleep 1

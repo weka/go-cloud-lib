@@ -82,7 +82,7 @@ func GetNetStrForDpdk() string {
 		net=""
 		for ((i; i<$j; i++)); do
 			interface=$interface_name$i
-			subnet_inet=$(ifconfig $interface | grep 'inet ' | awk '{print $2}')
+			subnet_inet=$(ip -4 addr show $interface | grep inet | awk '{print $2}' | cut -d/ -f1)
 			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
 				net="$net --net $interface" #aws
 				continue

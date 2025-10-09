@@ -75,13 +75,12 @@ func GetNetStrForDpdk() string {
 	function getNetStrForDpdk() {
 		i=$1
 		j=$2
-		interface_name=$3
-		gateways=$4
+		gateways=$3
 		gateways=($gateways) #azure and gcp
 
 		net=""
 		for ((i; i<$j; i++)); do
-			interface=$interface_name$i
+			interface=${all_interfaces[$i]}
 			subnet_inet=$(ip -4 addr show $interface | grep inet | awk '{print $2}' | cut -d/ -f1)
 			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
 				net="$net --net $interface" #aws
@@ -93,7 +92,7 @@ func GetNetStrForDpdk() string {
 			fi
 			bits=$(ip -o -f inet addr show $interface | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
-			
+
 			gateway=${gateways[$i]}
 			net="$net --net $enp/$subnet_inet/${netmask[1]}/$gateway"
 		done
@@ -104,8 +103,8 @@ func GetNetStrForDpdk() string {
 
 func SetCurrentManagementIp() string {
 	s := `
-	first_interface_name=$(ls /sys/class/net | grep -vE 'docker|veth|lo|enP|dtap' | sort --version-sort | head -n 1)
-	current_mngmnt_ip=$(ip -4 addr show $first_interface_name | grep inet | awk '{print $2}' | cut -d/ -f1)
+	getAllInterfaces
+	current_mngmnt_ip=$(ip -4 addr show ${all_interfaces[0]} | grep inet | awk '{print $2}' | cut -d/ -f1)
 	`
 	return dedent.Dedent(s)
 }
@@ -186,12 +185,11 @@ func SetBackendIpFunction() string {
 	return dedent.Dedent(s)
 }
 
-func GetFirstInterfaceNameAndNumber() string {
+func GetAllInterfaces() string {
 	s := `
-	function getFirstInstanceNameAndNumber {
-		first_interface_name=$(ls /sys/class/net | grep -vE 'docker|veth|lo|enP' | sort --version-sort | head -n 1)
-		interfaces_base_name=$(echo $first_interface_name | awk '{gsub(/[0-9]/,"",$1); print $1}')
-		first_interface_number=$(echo $first_interface_name | grep -o '[0-9]*$')
+	function getAllInterfaces {
+		# Store all interfaces in array for non-sequential interface naming (e.g., OCI: ens3, ens5, ens6, ens7)
+		all_interfaces=($(ls /sys/class/net | grep -vE 'docker|veth|lo|enP|dtap' | sort --version-sort))
 	}
 	`
 

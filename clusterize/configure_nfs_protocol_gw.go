@@ -27,8 +27,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	containersUid=(%s)
 	nic_names=(%s)
 	secondary_ips=(%s)
-	gateway="%s"
-	subnet_mask="%s"
 	LOAD_BALANCER_IP="%s"
 
 	# fetch function definition
@@ -67,13 +65,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
 	
-	if [ -z "$gateway" ]; then
-		gateway=$(ip r | grep default | awk '{print $3}')
-	fi
-
-	if [ -z "$subnet_mask" ]; then
-		subnet_mask=$(ip -4 addr show $nic_name | grep inet | awk '{print $2}' | cut -d/ -f2)
-	fi
+	gateway=$(ip r | grep default | awk '{print $3}')
 
 	function create_interface_group() {
 		if weka_rest interfacegroups | grep ${interface_group_name}; then
@@ -81,8 +73,8 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 			return
 		fi
 		echo "$(date -u): creating interface group ${interface_group_name}"
-		#weka nfs interface-group add ${interface_group_name} NFS --subnet $subnet_mask --gateway $gateway
-		weka_rest interfacegroups "{\"name\":\"$interface_group_name\",\"type\":\"nfs\",\"subnet\":\"$subnet_mask\",\"gateway\":\"$gateway\"}"
+		#weka nfs interface-group add ${interface_group_name} NFS --subnet $current_mngmnt_ip --gateway $gateway
+		weka_rest interfacegroups "{\"name\":\"$interface_group_name\",\"type\":\"nfs\",\"subnet\":\"$current_mngmnt_ip\",\"gateway\":\"$gateway\"}"
 		echo "$(date -u): interface group ${interface_group_name} created"
 	}
 	
@@ -164,8 +156,6 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		strings.Join(c.Params.ContainersUid, " "),
 		strings.Join(c.Params.NicNames, " "),
 		strings.Join(c.Params.SecondaryIps, " "),
-		c.Params.Gateway,
-		c.Params.SubnetMask,
 		c.LoadBalancerIP,
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch),
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.Report),

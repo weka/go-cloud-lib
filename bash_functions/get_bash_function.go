@@ -73,6 +73,7 @@ func GetCoreIds() string {
 func GetNetStrForDpdk() string {
 	s := `
 	function getNetStrForDpdk() {
+		# depends on getAllInterfaces function call
 		i=$1
 		j=$2
 		gateways=$3
@@ -103,7 +104,7 @@ func GetNetStrForDpdk() string {
 
 func SetCurrentManagementIp() string {
 	s := `
-	getAllInterfaces
+	# depends on getAllInterfaces function call
 	current_mngmnt_ip=$(ip -4 addr show ${all_interfaces[0]} | grep inet | awk '{print $2}' | cut -d/ -f1)
 	`
 	return dedent.Dedent(s)

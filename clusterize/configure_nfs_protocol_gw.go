@@ -114,7 +114,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	}
 
 	# create interface group if not exists
-	create_interface_group || true
+	create_interface_group || (report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"error\", \"message\": \"Failed to create NFS interface group\"}" && exit 1)
 	
 	# show interface group
 	#weka nfs interface-group

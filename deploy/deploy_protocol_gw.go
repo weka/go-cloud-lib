@@ -68,6 +68,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	# set_backend_ip bash function definition
 	%s
+
+	getAllInterfaces
 	# set current management ip
 	%s
 
@@ -94,8 +96,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# set value for backend_ip variable
 	set_backend_ip
 	echo "(date -u): backend_ip: $backend_ip"
-
-	getAllInterfaces
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		getNetStrForDpdk 1 $((1+$FRONTEND_CONTAINER_CORES_NUM)) "$GATEWAYS"

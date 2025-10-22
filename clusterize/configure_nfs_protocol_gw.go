@@ -48,6 +48,10 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# weka rest function definition (requires $backend_ip var to be set)
 	%s
 
+	# getAllInterfaces bash function definition
+	%s
+
+	getAllInterfaces
 	# set current management ip
 	%s
 
@@ -168,6 +172,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		c.FuncDef.GetFunctionCmdDefinition(functions_def.ClusterizeFinalization),
 		bash_functions.SetBackendIpFunction(),
 		bash_functions.WekaRestFunction(),
+		bash_functions.GetAllInterfaces(),
 		bash_functions.SetCurrentManagementIp(),
 	)
 

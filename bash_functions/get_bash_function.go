@@ -196,3 +196,17 @@ func GetAllInterfaces() string {
 
 	return dedent.Dedent(s)
 }
+
+func PrefixToNetmask() string {
+	s := `
+	function prefix_to_netmask() {
+		# Converts CIDR prefix length to dotted decimal netmask
+		# Example: prefix_to_netmask 20 -> 255.255.240.0
+		local prefix=$1
+		local mask=$((0xffffffff << (32 - prefix)))
+		echo "$(( (mask >> 24) & 0xff )).$(( (mask >> 16) & 0xff )).$(( (mask >> 8) & 0xff )).$(( mask & 0xff ))"
+	}
+	`
+
+	return dedent.Dedent(s)
+}

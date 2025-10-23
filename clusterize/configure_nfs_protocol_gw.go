@@ -64,8 +64,10 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	set -x
 
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
-	
 	gateway=$(ip r | grep default | awk '{print $3}')
+	cidr=$(ip -o -f inet addr show $nic_name | grep "$current_mngmnt_ip/" | awk '{print $4}' | cut -d'/' -f2)
+	mask=$((0xffffffff << (32-cidr)))
+	subnet_mask=$(printf "%d.%d.%d.%d\n" $((mask>>24&0xff)) $((mask>>16&0xff)) $((mask>>8&0xff)) $((mask&0xff)))
 
 	function create_interface_group() {
 		if weka_rest interfacegroups | grep ${interface_group_name}; then
@@ -73,8 +75,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 			return
 		fi
 		echo "$(date -u): creating interface group ${interface_group_name}"
-		#weka nfs interface-group add ${interface_group_name} NFS --subnet $current_mngmnt_ip --gateway $gateway
-		weka_rest interfacegroups "{\"name\":\"$interface_group_name\",\"type\":\"nfs\",\"subnet\":\"$current_mngmnt_ip\",\"gateway\":\"$gateway\"}"
+		weka_rest interfacegroups "{\"name\":\"$interface_group_name\",\"type\":\"nfs\",\"subnet\":\"$subnet_mask\",\"gateway\":\"$gateway\"}"
 		echo "$(date -u): interface group ${interface_group_name} created"
 	}
 	

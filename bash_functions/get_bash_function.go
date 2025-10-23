@@ -146,12 +146,35 @@ func WekaRestFunction() string {
 		endpoint="$1"
 		data="$2"
 		set +x
-		access_token=$(curl -sS --fail -X POST --insecure "https://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}" | jq -r '.data.access_token') || (set -x && return 1)
-		if [ -z "$data" ]; then
-			curl -sS --fail --insecure "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" || (set -x && return 1)
-		else
-			curl -sS --fail -X POST --insecure "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data" || (set -x && return 1)
+		tmpfile=$(mktemp)
+		http_code=$(curl -sS -X POST --insecure -w "%{http_code}" -o "$tmpfile" "https://$backend_ip:14000/api/v2/login" -H "Content-Type: application/json" -d "{\"username\":\"$WEKA_USERNAME\",\"password\":\"$WEKA_PASSWORD\"}")
+		response=$(cat "$tmpfile")
+		rm -f "$tmpfile"
+		if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+			echo "Login request failed with HTTP code: $http_code. Response: $response"
+			set -x
+			return 1
 		fi
+		access_token=$(echo "$response" | jq -r '.data.access_token')
+		if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
+			echo "Failed to extract access token. Response: $response"
+			set -x
+			return 1
+		fi
+		tmpfile=$(mktemp)
+		if [ -z "$data" ]; then
+			http_code=$(curl -sS --insecure -w "%{http_code}" -o "$tmpfile" "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token")
+		else
+			http_code=$(curl -sS -X POST --insecure -w "%{http_code}" -o "$tmpfile" "https://$backend_ip:14000/api/v2/$endpoint" -H "Authorization: Bearer $access_token" -H "Content-Type: application/json" -d "$data")
+		fi
+		response=$(cat "$tmpfile")
+		rm -f "$tmpfile"
+		if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+			echo "API request failed for endpoint: $endpoint with HTTP code: $http_code. Response: $response"
+			set -x
+			return 1
+		fi
+		echo "$response"
 		set -x
 	}
 	`

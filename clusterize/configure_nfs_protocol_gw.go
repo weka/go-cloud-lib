@@ -53,6 +53,9 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 	# set current management ip
 	%s
 
+	# prefix_to_netmask bash function definition
+	%s
+
 	nfs_count=${#containersUid[@]}
 
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"progress\", \"message\": \"This ($instance_name) is nfs instance $nfs_count/$nfs_count that is ready for joining the interface group\"}"
@@ -65,9 +68,8 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 
 	nic_name=$(ip -o -f inet addr show | grep "$current_mngmnt_ip/"| awk '{print $2}')
 	gateway=$(ip r | grep default | awk '{print $3}')
-	cidr=$(ip -o -f inet addr show $nic_name | grep "$current_mngmnt_ip/" | awk '{print $4}' | cut -d'/' -f2)
-	mask=$((0xffffffff << (32-cidr)))
-	subnet_mask=$(printf "%d.%d.%d.%d\n" $((mask>>24&0xff)) $((mask>>16&0xff)) $((mask>>8&0xff)) $((mask&0xff)))
+	prefix=$(ip -o -f inet addr show $nic_name | grep "$current_mngmnt_ip/" | awk '{print $4}' | cut -d'/' -f2)
+	subnet_mask=$(prefix_to_netmask $prefix)
 
 	function create_interface_group() {
 		if weka_rest interfacegroups | grep ${interface_group_name}; then
@@ -165,6 +167,7 @@ func (c *ConfigureNfsScriptGenerator) GetNFSSetupScript() string {
 		bash_functions.WekaRestFunction(),
 		bash_functions.GetAllInterfaces(),
 		bash_functions.SetCurrentManagementIp(),
+		bash_functions.PrefixToNetmask(),
 	)
 
 	return dedent.Dedent(nfsSetupScript)

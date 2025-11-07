@@ -1,6 +1,6 @@
 module github.com/weka/go-cloud-lib
 
-go 1.24.1
+go 1.25.4
 
 require (
 	github.com/google/uuid v1.3.0

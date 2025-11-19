@@ -51,7 +51,7 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 	`
 
 	cgroupsMode := "auto"
-	if d.Params.CgroupsMode != "" && d.Params.Protocol == "" {
+	if d.Params.CgroupsMode != "" && (d.Params.Protocol == "" || d.Params.Protocol == protocol.DATA) {
 		cgroupsMode = d.Params.CgroupsMode
 	}
 

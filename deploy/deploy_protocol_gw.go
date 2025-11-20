@@ -79,6 +79,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# weka frontend setup
 	get_core_ids $FRONTEND_CONTAINER_CORES_NUM frontend_core_ids
 
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"waiting for WEKA cluster clusterization completion\"}"
 	clusterized=$(status "{\"type\": \"status\"}" | jq .clusterized)
 	while [ "$clusterized" != "true" ];
 	do
@@ -111,6 +112,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		join_ips=$LOAD_BALANCER_IP
 	fi
 
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"setting frontend0 container\"}"
 	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips
 	
 	echo "$(date -u): success to run weka frontend container"
@@ -166,6 +168,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 		# make primary ip the management ip for the weka container
 		if [ "$current_mngmnt_ip" != "$primary_ip" ]; then
+			report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"updating frontend0 container (id:$container_id) management IP $current_mngmnt_ip --> $primary_ip\"}"
 			weka cluster container management-ips $container_id $primary_ip
 			weka cluster container apply $container_id -f
 
@@ -189,11 +192,13 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		fi
 	fi
 
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
 	echo "$(date -u): finished preparation for protocol setup"
 
 	echo "$(date -u): running validation for setting protocol script"
 	config_filesystem_name=".config_fs"
 	function wait_for_config_fs(){
+	  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"validating $config_filesystem_name fs is set\"}"
 	  max_retries=30 # 30 * 10 = 5 minutes
 	  for (( i=0; i < max_retries; i++ )); do
 		if [ "$(weka fs | grep -c $config_filesystem_name)" -ge 1 ]; then
@@ -212,6 +217,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	}
 
 	# make sure weka cluster is already up
+	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"validating weka cluster status is OK\"}"
 	max_retries=60
 	for (( i=0; i < max_retries; i++ )); do
 	  if [ $(weka status | grep 'status: OK' | wc -l) -ge 1 ]; then
@@ -226,25 +232,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		echo "$(date -u): $err_msg"
 		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$err_msg\"}"
 		exit 1
-	fi
-
-	# get container id
-	for ((i=0; i<20; i++)); do
-	  container_id=$(weka cluster container | grep frontend0 | grep "$HOSTNAME" | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
-	  if [ -n "$container_id" ]; then
-		  echo "$(date -u): frontend0 container id: $container_id"
-		  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
-		  break
-	  fi
-	  echo "$(date -u): waiting for frontend0 container to be up"
-	  sleep 5
-	done
-
-	if [ -z "$container_id" ]; then
-	  err_msg="Failed to get the frontend0 container ID."
-	  echo "$(date -u): $err_msg"
-	  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-	  exit 1
 	fi
 
 	# if protocol isn't NFS, wait for the config filesystem to be up

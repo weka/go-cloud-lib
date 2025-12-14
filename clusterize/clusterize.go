@@ -161,17 +161,17 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	function add_drives() {
 		bad_drives=false
 		drive_num=$1
+		weka_hostname=$(weka cluster container $drive_num -J | jq -r '.[0].hostname')
 		if ! weka cluster drive add $drive_num $devices_str; then
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed adding drives: $drive_num: $devices_str\"}"
+			report "{\"hostname\": \"$weka_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str\"}"
 			bad_drives=true
 		fi
 
 		if [ $bad_drives = true ]; then
-			weka_hostname=$(weka cluster container -c $drive_num | tail -n +2 | awk '{print $2}')
 			containers=($(weka cluster container | grep $weka_hostname | awk '{print $1}'))
 			for c in "${containers[@]}"
 			do
-				report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"
+				report "{\"hostname\": \"$weka_hostname\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"
 				weka cluster container deactivate $c || true
 			done
 
@@ -190,12 +190,14 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 				done
 			done
 
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Removing drives: $drive_num\"}"
+			report "{\"hostname\": \"$weka_hostname\", \"type\": \"debug\", \"message\": \"Removing drive container $drive_num drives\"}"
 			drives=($(weka cluster drive | grep $weka_hostname | awk '{print $2}'))
 			for d in "${drives[@]}"
 			do
 				weka cluster drive remove $d -f || true
 			done
+		else
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Drives added successfully for $weka_hostname\"}"
 		fi
 	}
 

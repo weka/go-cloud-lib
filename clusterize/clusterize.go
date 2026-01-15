@@ -133,7 +133,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 
-	set +x
+	#set +x
 	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating cluster\"}" && exit 1)
 	weka user login admin $WEKA_ADMIN_PASSWORD
 
@@ -141,7 +141,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	# weka user add <username> <role> [password]
 	weka user add $WEKA_DEPLOYMENT_USERNAME clusteradmin "$WEKA_DEPLOYMENT_PASSWORD" || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating deployment user\"}"
 	weka user
-	set -x
+	#set -x
 	
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Deployment user was created successfully\"}"
 	# post cluster creation script

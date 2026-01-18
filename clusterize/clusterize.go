@@ -162,8 +162,9 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		bad_drives=false
 		drive_num=$1
 		weka_hostname=$(weka cluster container $drive_num -J | jq -r '.[0].hostname')
-		if ! weka cluster drive add $drive_num $devices_str; then
-			report "{\"hostname\": \"$weka_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str\"}"
+		if ! output=$(weka cluster drive add $drive_num $devices_str 2>&1); then
+			output="${output//$'\n'/ }"
+			report "{\"hostname\": \"$weka_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str Error: $output\"}"
 			bad_drives=true
 		fi
 

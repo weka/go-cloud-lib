@@ -1,6 +1,8 @@
 package bash_functions
 
 import (
+	"fmt"
+
 	"github.com/lithammer/dedent"
 )
 
@@ -70,18 +72,31 @@ func GetCoreIds() string {
 	return dedent.Dedent(s)
 }
 
-func GetNetStrForDpdk() string {
+func GetNetStrForDpdk(isBM bool, gateways string) string {
+	isBMStr := "false"
+	if isBM {
+		isBMStr = "true"
+	}
+
 	s := `
 	function getNetStrForDpdk() {
 		# depends on getAllInterfaces function call
 		i=$1
 		j=$2
-		gateways=$3
-		gateways=($gateways) #azure and gcp
+		is_bm=%s
+		gateways=(%s) #azure and gcp
 
 		net=""
-		for ((i; i<$j; i++)); do
-			interface=${all_interfaces[$i]}
+		if [[ "$is_bm" == "true" ]]; then
+			first=0
+			last=$((j-i))
+		else
+			first=$i
+			last=$j
+		fi
+
+		for ((idx=first; idx<last; idx++)); do
+			interface=${all_interfaces[$idx]}
 			subnet_inet=$(ip -4 addr show $interface | grep inet | awk '{print $2}' | cut -d/ -f1)
 			if [ -z $subnet_inet ] || [ ${#gateways[@]} -eq 0 ];then
 				net="$net --net $interface" #aws
@@ -94,12 +109,12 @@ func GetNetStrForDpdk() string {
 			bits=$(ip -o -f inet addr show $interface | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
 
-			gateway=${gateways[$i]}
+			gateway=${gateways[$idx]}
 			net="$net --net $enp/$subnet_inet/${netmask[1]}/$gateway"
 		done
 	}
 	`
-	return dedent.Dedent(s)
+	return fmt.Sprintf(dedent.Dedent(s), isBMStr, gateways)
 }
 
 func SetCurrentManagementIp() string {

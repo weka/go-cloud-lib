@@ -17,9 +17,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	fetchFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Fetch)
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
-	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
-	getAllInterfaces := bash_functions.GetAllInterfaces()
 	gateways := strings.Join(d.Params.Gateways, " ")
+	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk(d.Params.IsBM, gateways)
+	getAllInterfaces := bash_functions.GetAllInterfaces()
 
 	wekaRestFunc := bash_functions.WekaRestFunction()
 	setBackendIpFunc := bash_functions.SetBackendIpFunction()
@@ -32,7 +32,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	LOAD_BALANCER_IP="%s"
 	SECONDARY_IPS_NUM=%d
 	PROTOCOL="%s"
-	GATEWAYS="%s"
 
 	# protect function definition (if any)
 	%s
@@ -99,7 +98,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	echo "(date -u): backend_ip: $backend_ip"
 
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $((1+$FRONTEND_CONTAINER_CORES_NUM)) "$GATEWAYS"
+		getNetStrForDpdk 1 $((1+$FRONTEND_CONTAINER_CORES_NUM))
 	else
 		net=""
 	fi
@@ -247,7 +246,6 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		d.Params.LoadBalancerIP,
 		d.Params.NFSSecondaryIpsNum,
 		d.Params.Protocol,
-		gateways,
 		protectFunc,
 		fetchFunc,
 		statusFunc,

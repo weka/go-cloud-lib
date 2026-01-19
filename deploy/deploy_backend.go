@@ -17,9 +17,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	reportFunc := d.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 
 	getCoreIdsFunc := bash_functions.GetCoreIds()
-	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
-	getAllInterfaces := bash_functions.GetAllInterfaces()
 	gateways := strings.Join(d.Params.Gateways, " ")
+	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk(d.Params.IsBM, gateways)
+	getAllInterfaces := bash_functions.GetAllInterfaces()
 	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
 	template := `
@@ -34,7 +34,6 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	NICS_NUM=%s
 	NVMES_NUM=%d
 	INSTALL_DPDK=%t
-	GATEWAYS="%s"
 
 	# clusterize function definition
 	%s
@@ -74,9 +73,9 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	getAllInterfaces
 
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $((1+$DRIVE_CONTAINER_CORES_NUM)) "$GATEWAYS"
+		getNetStrForDpdk 1 $((1+$DRIVE_CONTAINER_CORES_NUM))
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate $net
-		getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM)) $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) "$GATEWAYS"
+		getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM)) $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM))
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate $net
 	else
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate --net udp
@@ -87,7 +86,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 		total_containers=3
 		get_core_ids $FRONTEND_CONTAINER_CORES_NUM frontend_core_ids
 		if [[ $INSTALL_DPDK == true ]]; then
-			getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $NICS_NUM "$GATEWAYS"
+			getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $NICS_NUM
 			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate $net
 		else
 			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate --net udp
@@ -125,7 +124,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.NvmesNum, d.Params.InstallDpdk,
-		gateways, clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getAllInterfaces, d.DeviceNameCmd,
+		clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getAllInterfaces, d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(), wekaInstallScript, d.Params.FindDrivesScript,
 	)
 	return dedent.Dedent(script)

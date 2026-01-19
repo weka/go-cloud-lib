@@ -15,6 +15,7 @@ type DeploymentParams struct {
 	WekaInstallUrl            string
 	WekaToken                 string
 	InstallDpdk               bool
+	IsBM                      bool
 	NicsNum                   string
 	NvmesNum                  int
 	ProxyUrl                  string

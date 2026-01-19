@@ -16,6 +16,7 @@ import (
 type JoinParams struct {
 	IPs            []string
 	InstallDpdk    bool
+	IsBM           bool
 	InstanceParams protocol.BackendCoreCount
 	Gateways       []string
 	ProxyUrl       string
@@ -35,9 +36,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	reportFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.Report)
 	joinFinalizationFunc := j.FuncDef.GetFunctionCmdDefinition(functions_def.JoinFinalization)
 	getCoreIdsFunc := bash_functions.GetCoreIds()
-	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk()
-	getAllInterfaces := bash_functions.GetAllInterfaces()
 	gateways := strings.Join(j.Params.Gateways, " ")
+	getNetStrForDpdkFunc := bash_functions.GetNetStrForDpdk(j.Params.IsBM, gateways)
+	getAllInterfaces := bash_functions.GetAllInterfaces()
 	failureDomainCmd := bash_functions.GetHashedPrivateIpBashCmd()
 
 	ips := j.Params.IPs
@@ -56,7 +57,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	DRIVES=%d
 	COMPUTE_MEMORY=%s
 	INSTALL_DPDK=%t
-	GATEWAYS="%s"
 	host_ips=$(IFS=, ;echo "${IPS[*]}")
 	PROXY_URL="%s"
 	WEKA_CGROUPS_MODE="%s"
@@ -119,9 +119,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	mgmt_ip=$(hostname -I | awk '{print $1}')
 	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $((1+$DRIVES)) "$GATEWAYS"
+		getNetStrForDpdk 1 $((1+$DRIVES))
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate $net
-		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE)) "$GATEWAYS"
+		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate $net
 	else
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate --net udp
@@ -131,7 +131,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	if [[ $FRONTEND -gt 0 ]]; then
 		get_core_ids $FRONTEND frontend_core_ids
 		if [[ $INSTALL_DPDK == true ]]; then
-			getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1)) "$GATEWAYS"
+			getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1))
 			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate $net
 		else
 			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate --net udp
@@ -154,7 +154,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		drive,
 		mem,
 		j.Params.InstallDpdk,
-		gateways,
 		j.Params.ProxyUrl,
 		cgroupsMode,
 		reportFunc,

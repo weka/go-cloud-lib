@@ -165,38 +165,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		if ! output=$(weka cluster drive add $drive_num $devices_str 2>&1); then
 			output="${output//$'\n'/ }"
 			report "{\"hostname\": \"$weka_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str Error: $output\"}"
-			bad_drives=true
-		fi
-
-		if [ $bad_drives = true ]; then
-			containers=($(weka cluster container | grep $weka_hostname | awk '{print $1}'))
-			for c in "${containers[@]}"
-			do
-				report "{\"hostname\": \"$weka_hostname\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"
-				weka cluster container deactivate $c || true
-			done
-
-			all_inactive=false
-			while [ $all_inactive = false ] ; do
-				all_inactive=true
-				for c in "${containers[@]}"
-				do
-					status=$(weka cluster container -c $c | tail -n +2 | awk '{print $5}')
-					if [ "$status" != "INACTIVE" ]; then
-						echo "Container $c status:$status"
-						all_inactive=false
-						sleep 5
-						break
-					fi
-				done
-			done
-
-			report "{\"hostname\": \"$weka_hostname\", \"type\": \"debug\", \"message\": \"Removing drive container $drive_num drives\"}"
-			drives=($(weka cluster drive | grep $weka_hostname | awk '{print $2}'))
-			for d in "${drives[@]}"
-			do
-				weka cluster drive remove $d -f || true
-			done
 		else
 			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Drives added successfully for $weka_hostname\"}"
 		fi

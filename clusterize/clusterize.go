@@ -161,6 +161,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	function add_drives() {
 		bad_drives=false
 		drive_num=$1
+		weka cluster container $drive_num 
 		weka_hostname=$(weka cluster container $drive_num -J | jq -r '.[0].hostname')
 		if ! output=$(weka cluster drive add $drive_num $devices_str 2>&1); then
 			output="${output//$'\n'/ }"

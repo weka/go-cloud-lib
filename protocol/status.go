@@ -38,10 +38,11 @@ type ClusterState struct {
 }
 
 type ClusterStatus struct {
-	InitialSize int        `json:"initial_size"`
-	DesiredSize int        `json:"desired_size"`
-	Clusterized bool       `json:"clusterized"`
-	WekaStatus  WekaStatus `json:"weka_status"`
+	InitialSize    int                     `json:"initial_size"`
+	DesiredSize    int                     `json:"desired_size"`
+	Clusterized    bool                    `json:"clusterized"`
+	WekaStatus     WekaStatus              `json:"weka_status"`
+	InstanceRefresh *InstanceRefreshProgress `json:"instance_refresh,omitempty"`
 }
 
 type Report struct {

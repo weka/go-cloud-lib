@@ -161,12 +161,13 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	function add_drives() {
 		bad_drives=false
 		drive_num=$1
-		weka_hostname=$(weka cluster container $drive_num -J | jq -r '.[0].hostname')
+		drive_container_info=$(weka cluster container $drive_num -J)
+		drive_container_hostname=$(echo $drive_container_info | jq -r '.[0].hostname')
 		if ! output=$(weka cluster drive add $drive_num $devices_str 2>&1); then
 			output="${output//$'\n'/ }"
-			report "{\"hostname\": \"$weka_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str Error: $output\"}"
+			report "{\"hostname\": \"$drive_container_hostname\", \"type\": \"error\", \"message\": \"Failed adding drives for drive container $drive_num: $devices_str Error: $output\"}"
 		else
-			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Drives added successfully for $weka_hostname\"}"
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Drives added successfully for $drive_container_hostname\"}"
 		fi
 	}
 

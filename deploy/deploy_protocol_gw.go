@@ -118,6 +118,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	while true
 	do
+		weka local ps
+		weka local ps -J
 		state=$(weka local ps -J | jq -r .[0].internalStatus.state)
 		if [[ "$state" == "READY" ]]; then
 			break

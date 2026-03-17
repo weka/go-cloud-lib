@@ -118,9 +118,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	while true
 	do
-		ready_containers=$( weka local ps | grep frontend0 | grep -i 'running' | wc -l )
-		echo "Running containers: $ready_containers"
-		if [[ $ready_containers -eq 1 ]]; then
+		state=$(weka local ps -J | jq -r .[0].internalStatus.state)
+		if [[ "$state" == "READY" ]]; then
 			break
 		fi
 		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container is not ready, going to sleep for 10 seconds\"}"

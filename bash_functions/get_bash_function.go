@@ -146,7 +146,10 @@ func GetWekaPartitionScript() string {
 		echo "$(date -u): wekaiosw_device: $wekaiosw_device"
 
 		sleep 4
-		mkfs_output=$(mkfs.ext4 -F -L wekaiosw "$wekaiosw_device" 2>&1) || handle_error $? "Failed to create filesystem on $wekaiosw_device for mounting /opt/weka: $mkfs_output"
+		mkfs_output=$(mkfs.ext4 -F -L wekaiosw "$wekaiosw_device" 2>&1) || {
+			handle_error $? "Failed to create filesystem on $wekaiosw_device for mounting /opt/weka: $mkfs_output"
+			findmnt "$wekaiosw_device" || true
+		}
 		mkdir -p /opt/weka || handle_error $? "Failed to create /opt/weka directory"
 		mount "$wekaiosw_device" /opt/weka || handle_error $? "Failed to mount WekaIO volume"
 		echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab

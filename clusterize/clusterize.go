@@ -216,8 +216,29 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka dataservice global-config set --config-fs .config_fs || true
 
 	if [[ $SET_DEFAULT_FS == true ]]; then
-		full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
-		weka fs create default default "$full_capacity"B
+		unprovisioned_bytes=""
+		elapsed=0
+		max_wait=600
+		sleep_duration=10
+
+		while [ $elapsed -lt $max_wait ]; do
+			output=$(weka status -J 2>&1)
+			if unprovisioned_bytes=$(echo "$output" | jq -r .capacity.unprovisioned_bytes 2>&1) && [ "$unprovisioned_bytes" != "null" ]; then
+				break
+			fi
+
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Failed to fetch capacity from weka, retrying in ${sleep_duration}s (elapsed: ${elapsed}s). Error: $unprovisioned_bytes\"}"
+			sleep $sleep_duration
+			elapsed=$((elapsed + sleep_duration))
+			sleep_duration=$((sleep_duration * 2 > 120 ? 120 : sleep_duration * 2))
+		done
+
+		if [ -z "$unprovisioned_bytes" ] || [ "$unprovisioned_bytes" == "null" ]; then
+			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to fetch capacity after 10 minutes\"}"
+			exit 1
+		fi
+
+		weka fs create default default "$unprovisioned_bytes"B
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Default FS was created successfully\"}"
 	fi
 

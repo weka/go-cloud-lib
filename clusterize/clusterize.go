@@ -24,6 +24,7 @@ type ClusterParams struct {
 	SetObs                    bool
 	CreateConfigFs            bool
 	ObsScript                 string
+	TieringSSDPercent         int
 	TieringTargetSSDRetention int
 	TieringStartDemote        int
 	DataProtection            DataProtectionParams
@@ -260,6 +261,9 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 			%s
 		}
 		set_obs || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"OBS setup failed\"}" && exit 1)
+		OBS_TIERING_SSD_PERCENT=%d
+		tiering_percent=$(($unprovisioned_bytes * 100 / $OBS_TIERING_SSD_PERCENT)) || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Tiering percent calculation failed\"}" && exit 1)
+		weka fs update default --total-capacity "$tiering_percent"B || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Tiering update failed\"}" && exit 1)
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"OBS setup completed successfully\"}"
 	else
 		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Skipping OBS setup\"}"
@@ -303,6 +307,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		params.PostClusterCreationScript,
 		params.PreStartIoScript,
 		params.ObsScript,
+		params.TieringSSDPercent,
 		params.PostClusterSetupScript,
 	)
 	return script

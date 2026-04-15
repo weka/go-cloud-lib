@@ -118,7 +118,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 
 	while true
 	do
-		frontend_info=$(weka local ps -J | jq -r .[0])
+		frontend_info=$(weka local ps -J | jq '.[] | select(.name == "frontend0")')
 		frontend_state=$(echo $frontend_info | jq -r .internalStatus.state)
 		frontend_display_status=$(echo $frontend_info | jq -r .internalStatus.display_status)
 		if [[ "$frontend_state" == "READY" && "$frontend_display_status" == "READY" ]]; then

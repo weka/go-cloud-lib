@@ -116,8 +116,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	
 	echo "$(date -u): success to run weka frontend container"
 
-	while true
-	do
+	max_retries=18 # 18 * 10 = 3 minutes
+	for ((i=0; i<max_retries; i++)); do
 		frontend_info=$(weka local ps -J | jq '.[] | select(.name == "frontend0")')
 		frontend_state=$(echo $frontend_info | jq -r .internalStatus.state)
 		frontend_display_status=$(echo $frontend_info | jq -r .internalStatus.display_status)
@@ -127,6 +127,12 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container is not ready, going to sleep for 10 seconds\"}"
 		sleep 10
 	done
+	if [[ "$frontend_state" != "READY" || "$frontend_display_status" != "READY" ]]; then
+		msg="timeout: frontend0 container is not ready after 3 minutes. state: $frontend_state, display_status: $frontend_display_status"
+		echo "$(date -u): $msg"
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"$msg\"}"
+		exit 1
+	fi
 
 	echo "$(date -u): frontend is up"
 

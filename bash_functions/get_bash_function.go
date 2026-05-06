@@ -120,7 +120,7 @@ func GetNetStrForDpdk(isBM bool, gateways string) string {
 func SetCurrentManagementIp() string {
 	s := `
 	# depends on getAllInterfaces function call
-	current_mngmnt_ip=$(ip -4 addr show ${all_interfaces[0]} | grep inet | awk '{print $2}' | cut -d/ -f1)
+	current_mngmnt_ip=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
 	`
 	return dedent.Dedent(s)
 }

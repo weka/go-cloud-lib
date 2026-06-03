@@ -116,6 +116,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	
 	echo "$(date -u): success to run weka frontend container"
 
+	timeout=180
+	elapsed=0
 	while true
 	do
 		frontend_info=$(weka local ps -J | jq '.[] | select(.name == "frontend0")')
@@ -124,8 +126,13 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		if [[ "$frontend_state" == "READY" && "$frontend_display_status" == "READY" ]]; then
 			break
 		fi
+		if [[ $elapsed -ge $timeout ]]; then
+			report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"frontend0 container did not become ready within ${timeout} seconds\"}"
+			exit 1
+		fi
 		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"frontend0 container is not ready, going to sleep for 10 seconds\"}"
 		sleep 10
+		elapsed=$((elapsed + 10))
 	done
 
 	echo "$(date -u): frontend is up"

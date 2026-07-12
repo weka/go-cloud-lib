@@ -32,7 +32,6 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	FRONTEND_CONTAINER_CORES_NUM=%d
 	DRIVE_CONTAINER_CORES_NUM=%d
 	NICS_NUM=%s
-	NVMES_NUM=%d
 	INSTALL_DPDK=%t
 
 	# clusterize function definition
@@ -110,8 +109,8 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
 	devices=$(weka local run --container compute0 bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	devices=($devices)
-	for (( d=0; d<$NVMES_NUM; d++ )); do
-		while ! lsblk "${devices[$d]}" >/dev/null 2>&1; do
+	for device in "${devices[@]}"; do
+		while ! lsblk "$device" >/dev/null 2>&1; do
 			echo "waiting for nvme to be ready"
 			sleep 5
 		done
@@ -123,7 +122,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	`
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
-		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.NvmesNum, d.Params.InstallDpdk,
+		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
 		clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getAllInterfaces, d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(), wekaInstallScript, d.Params.FindDrivesScript,
 	)

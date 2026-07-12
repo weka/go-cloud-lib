@@ -100,7 +100,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	set -x
 	devices=($devices)
-
+	exit 0
 	CONTAINER_NAMES=(drives0 compute0)
 	PORTS=(14000 15000)
 

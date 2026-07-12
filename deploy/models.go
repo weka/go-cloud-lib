@@ -17,7 +17,6 @@ type DeploymentParams struct {
 	InstallDpdk               bool
 	IsBM                      bool
 	NicsNum                   string
-	NvmesNum                  int
 	ProxyUrl                  string
 	FindDrivesScript          string
 	Gateways                  []string

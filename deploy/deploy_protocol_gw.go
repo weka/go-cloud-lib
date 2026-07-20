@@ -230,7 +230,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"validating weka cluster status is OK\"}"
 	max_retries=60
 	for (( i=0; i < max_retries; i++ )); do
-	  if [ $(weka status | grep 'status: OK' | wc -l) -ge 1 ]; then
+	  if [ "$(weka status -J 2>/dev/null | jq -r .status)" == "OK" ]; then
 		echo "$(date -u): weka cluster is up"
 		break
 	  fi

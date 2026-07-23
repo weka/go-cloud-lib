@@ -192,14 +192,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	if [ "$STRIPE_WIDTH" -gt 0 ] && [ "$PROTECTION_LEVEL" -gt 0 ]; then
 		weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	fi
-
-	# the raft council must keep quorum after losing PROTECTION_LEVEL leaders, i.e. have 2 * PROTECTION_LEVEL + 1 members;
-	# weka cluster create defaults to 5, which is only correct for PROTECTION_LEVEL=2
-	RAFT_SIZE=$((2 * PROTECTION_LEVEL + 1))
-	if [ "$RAFT_SIZE" -gt 5 ]; then
-		weka cluster update --bucket-raft-size "$RAFT_SIZE" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed updating raft size to $RAFT_SIZE\"}" && exit 1)
-	fi
-
 	weka cluster hot-spare $HOTSPARE
 
 	# pre start-io script

@@ -214,7 +214,7 @@ func (j *JoinScriptGenerator) GetExistingContainersJoinScript(ctx context.Contex
 	weka local resources join-ips --container compute0 $host_ips
 	weka local resources apply -f --container compute0
 
-	if [[ $(weka local ps | grep frontend0) ]]; then
+	if weka local ps --no-header -o name | grep -qx frontend0; then
 		sudo weka local resources management-ips $mgmt_ip -C frontend0
 		weka local resources join-ips --container frontend0 $host_ips
 		weka local resources apply -f --container frontend0
@@ -309,7 +309,7 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 		count=$((count+1))
 		if [ "$count" -gt 60 ]; then
 			report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to run drives scan\"}"
-			containers=($(weka cluster container | grep "$HOSTNAME" | awk '{print $1}'))
+			containers=($(weka cluster container -o id,hostname --no-header | awk -v h="$HOSTNAME" 'index($2, h) {print $1}'))
 			for c in "${containers[@]}"
 			do
 				report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"Deactivating container: $c\"}"

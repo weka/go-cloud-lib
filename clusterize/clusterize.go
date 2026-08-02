@@ -134,8 +134,12 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 
+	# the raft council must keep quorum after losing PROTECTION_LEVEL leaders, i.e. have 2 * PROTECTION_LEVEL + 1 members;
+	# weka cluster create defaults to 5, which is only correct for PROTECTION_LEVEL=2
+	RAFT_SIZE=$((2 * PROTECTION_LEVEL + 1))
+
 	set +x
-	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating cluster\"}" && exit 1)
+	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_ADMIN_PASSWORD" --leadership-size "$RAFT_SIZE" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed creating cluster\"}" && exit 1)
 	weka user login admin $WEKA_ADMIN_PASSWORD
 
 	# setup weka deployment user (internal, only used by cloud functions)
@@ -193,9 +197,6 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 		weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	fi
 
-	# the raft council must keep quorum after losing PROTECTION_LEVEL leaders, i.e. have 2 * PROTECTION_LEVEL + 1 members;
-	# weka cluster create defaults to 5, which is only correct for PROTECTION_LEVEL=2
-	RAFT_SIZE=$((2 * PROTECTION_LEVEL + 1))
 	if [ "$RAFT_SIZE" -gt 5 ]; then
 		weka cluster update --bucket-raft-size "$RAFT_SIZE" || (report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed updating raft size to $RAFT_SIZE\"}" && exit 1)
 	fi

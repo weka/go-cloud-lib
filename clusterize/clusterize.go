@@ -160,7 +160,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Adding drives\"}"
 
-	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
+	DRIVE_NUMS=( $(weka cluster container -o id,container --no-header | awk '$2 ~ /drives/ {print $1}') )
 	devices_str=$(IFS=' ' ;echo "${devices[*]}")
 
 	function add_drives() {

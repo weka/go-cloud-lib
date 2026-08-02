@@ -97,7 +97,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	while [[ $ready_containers -ne $total_containers ]];
 	do
 		sleep 10
-		ready_containers=$( weka local ps | grep -i 'running' | wc -l )
+		ready_containers=$(weka local ps --no-header -o state | grep -i running | wc -l)
 		echo "Running containers: $ready_containers"
 	done
 

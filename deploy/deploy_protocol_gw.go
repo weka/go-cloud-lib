@@ -185,7 +185,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 			# wait for container to be up
 			max_retries=12 # 12 * 10 = 2 minutes
 			for ((i=0; i<max_retries; i++)); do
-				status=$(weka cluster container $container_id | grep $container_id | awk '{print $5}')
+				status=$(weka cluster container $container_id -o status --no-header)
 				if [ "$status" == "UP" ]; then
 					echo "$(date -u): frontend0 container status: $status"
 					break
@@ -211,7 +211,7 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	  report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"validating $config_filesystem_name fs is set\"}"
 	  max_retries=30 # 30 * 10 = 5 minutes
 	  for (( i=0; i < max_retries; i++ )); do
-		if [ "$(weka fs | grep -c $config_filesystem_name)" -ge 1 ]; then
+		if weka fs --no-header -o name | grep -qFx "$config_filesystem_name"; then
 		  echo "$(date -u): weka filesystem $config_filesystem_name is up"
 		  break
 		fi

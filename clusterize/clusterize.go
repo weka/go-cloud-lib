@@ -220,7 +220,7 @@ func (c *ClusterizeScriptGenerator) GetClusterizeScript() string {
 	weka cluster container
 	
 	weka fs group create default --target-ssd-retention=$TARGET_SSD_RETENTION --start-demote=$START_DEMOTE || report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to create fs group\"}"
-	weka fs create .config_fs default 22GB
+	weka fs create .config_fs default 50GiB
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"FS '.config_fs' was created successfully\"}"
 	weka nfs global-config set --config-fs .config_fs || echo "Failed to set NFS global config fs"
 	weka dataservice global-config set --config-fs .config_fs || true

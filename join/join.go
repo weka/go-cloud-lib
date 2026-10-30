@@ -105,7 +105,10 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl --insecure https://$backend_ip:14000/dist/v1/install -o install.sh
 	chmod +x install.sh
-	PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh
+	if ! PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh; then
+		report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to install WEKA software\"}"
+		exit 1
+	fi
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"WEKA software installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current

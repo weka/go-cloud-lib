@@ -116,7 +116,10 @@ func (d *DeployScriptGenerator) GetWekaInstallScript() string {
 		sed -i -e 's/--noproxy \".amazonaws.com\"//g' ./install.sh
 		sed -i '/no_proxy/d' install.sh
 	fi
-	PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh
+	if ! PROXY="$PROXY_URL" WEKA_CGROUPS_MODE="$WEKA_CGROUPS_MODE" ./install.sh; then
+		report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"error\", \"message\": \"Failed to install WEKA software\"}"
+		exit 1
+	fi
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"Weka software installation completed\"}"
 	`
 

@@ -45,6 +45,12 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	# report function definition
 	%s
 
+	# setup_container function definition
+	%s
+
+	# setup_container_by_type function definition
+	%s
+
 	# get_core_ids bash function definition
 	%s
 
@@ -112,7 +118,9 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 	fi
 
 	report "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"$PROTOCOL\", \"type\": \"progress\", \"message\": \"setting frontend0 container\"}"
-	weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips
+	container_common_args=(--join-ips "$join_ips")
+	container_base_port=14000
+	setup_container_by_type frontend $FRONTEND_CONTAINER_CORES_NUM
 	
 	echo "$(date -u): success to run weka frontend container"
 
@@ -261,6 +269,8 @@ func (d *DeployScriptGenerator) GetBaseProtocolGWDeployScript() string {
 		fetchFunc,
 		statusFunc,
 		reportFunc,
+		bash_functions.SetupContainerFunction(true),
+		bash_functions.SetupContainerByTypeFunction(),
 		getCoreIdsFunc,
 		getNetStrForDpdkFunc,
 		getAllInterfaces,

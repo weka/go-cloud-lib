@@ -64,6 +64,12 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	# report function definition
 	%s
 
+	# setup_container function definition
+	%s
+
+	# setup_container_by_type function definition
+	%s
+
 	# join_finalization function definition
 	%s
 
@@ -71,6 +77,9 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	%s
 
 	# getNetStrForDpdk bash function definitiion
+	%s
+
+	# set_container_net bash function definition
 	%s
 
 	# getAllInterfaces bash function definition
@@ -121,24 +130,18 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	get_core_ids $COMPUTE compute_core_ids
 
 	mgmt_ip=$(hostname -I | awk '{print $1}')
-	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $((1+$DRIVES))
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate $net
-		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate $net
-	else
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --management-ips $mgmt_ip --dedicate --net udp
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --management-ips $mgmt_ip --dedicate --net udp
-	fi
+	container_common_args=(--join-ips "$host_ips" --failure-domain "$HASHED_IP" --management-ips "$mgmt_ip")
+
+	set_container_net 1 $((1+$DRIVES))
+	setup_container_by_type drive $DRIVES
+
+	set_container_net $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
+	setup_container_by_type compute $COMPUTE --memory "$COMPUTE_MEMORY"
 
 	if [[ $FRONTEND -gt 0 ]]; then
 		get_core_ids $FRONTEND frontend_core_ids
-		if [[ $INSTALL_DPDK == true ]]; then
-			getNetStrForDpdk $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1))
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate $net
-		else
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --management-ips $mgmt_ip --dedicate --net udp
-		fi
+		set_container_net $((1+$DRIVES+$COMPUTE)) $((1+$DRIVES+$COMPUTE+1))
+		setup_container_by_type frontend $FRONTEND
 	fi
 	`
 
@@ -160,9 +163,12 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		j.Params.ProxyUrl,
 		cgroupsMode,
 		reportFunc,
+		bash_functions.SetupContainerFunction(false),
+		bash_functions.SetupContainerByTypeFunction(),
 		joinFinalizationFunc,
 		getCoreIdsFunc,
 		getNetStrForDpdkFunc,
+		bash_functions.SetContainerNetFunction(),
 		getAllInterfaces,
 		j.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(),

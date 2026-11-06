@@ -43,10 +43,19 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	# report function definition
 	%s
 
+	# setup_container function definition
+	%s
+
+	# setup_container_by_type function definition
+	%s
+
 	# get_core_ids bash function definition
 	%s
 
 	# getNetStrForDpdk bash function definition
+	%s
+
+	# set_container_net bash function definition
 	%s
 
 	# getAllInterfaces bash function definition
@@ -71,25 +80,19 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 
 	getAllInterfaces
 
-	if [[ $INSTALL_DPDK == true ]]; then
-		getNetStrForDpdk 1 $((1+$DRIVE_CONTAINER_CORES_NUM))
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate $net
-		getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM)) $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM))
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate $net
-	else
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINER_CORES_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINER_CORES_NUM --failure-domain $FAILURE_DOMAIN --core-ids $drive_core_ids --dedicate --net udp
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE_CONTAINER_CORES_NUM --no-frontends --compute-dedicated-cores $COMPUTE_CONTAINER_CORES_NUM  --memory $COMPUTE_MEMORY --failure-domain $FAILURE_DOMAIN --core-ids $compute_core_ids --dedicate --net udp
-	fi
+	container_common_args=(--failure-domain "$FAILURE_DOMAIN")
+
+	set_container_net 1 $((1+$DRIVE_CONTAINER_CORES_NUM))
+	setup_container_by_type drive $DRIVE_CONTAINER_CORES_NUM
+
+	set_container_net $((1+$DRIVE_CONTAINER_CORES_NUM)) $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM))
+	setup_container_by_type compute $COMPUTE_CONTAINER_CORES_NUM --memory $COMPUTE_MEMORY
 
 	if [[ $FRONTEND_CONTAINER_CORES_NUM -gt 0 ]]; then
 		total_containers=3
 		get_core_ids $FRONTEND_CONTAINER_CORES_NUM frontend_core_ids
-		if [[ $INSTALL_DPDK == true ]]; then
-			getNetStrForDpdk $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $NICS_NUM
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate $net
-		else
-			sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids --dedicate --net udp
-		fi
+		set_container_net $((1+$DRIVE_CONTAINER_CORES_NUM+$COMPUTE_CONTAINER_CORES_NUM)) $NICS_NUM
+		setup_container_by_type frontend $FRONTEND_CONTAINER_CORES_NUM
 	fi
 
 	# should not call 'clusterize' until all 2/3 containers are up
@@ -123,7 +126,7 @@ func (d *DeployScriptGenerator) GetBackendDeployScript() string {
 	script := fmt.Sprintf(
 		template, d.Params.VMName, failureDomainCmd, d.Params.InstanceParams.ComputeMemory, d.Params.InstanceParams.Compute,
 		d.Params.InstanceParams.Frontend, d.Params.InstanceParams.Drive, d.Params.NicsNum, d.Params.InstallDpdk,
-		clusterizeFunc, protectFunc, reportFunc, getCoreIdsFunc, getNetStrForDpdkFunc, getAllInterfaces, d.DeviceNameCmd,
+		clusterizeFunc, protectFunc, reportFunc, bash_functions.SetupContainerFunction(false), bash_functions.SetupContainerByTypeFunction(), getCoreIdsFunc, getNetStrForDpdkFunc, bash_functions.SetContainerNetFunction(), getAllInterfaces, d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(), wekaInstallScript, d.Params.FindDrivesScript,
 	)
 	return dedent.Dedent(script)

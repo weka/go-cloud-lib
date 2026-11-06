@@ -32,6 +32,9 @@ func (d *DeployScriptGenerator) GetDataServiceDeployScript() string {
 	# report function definition
 	%s
 
+	# setup_container function definition
+	%s
+
 	# deviceNameCmd
 	wekaiosw_device="%s"
 	# wekio partition setup
@@ -67,7 +70,7 @@ func (d *DeployScriptGenerator) GetDataServiceDeployScript() string {
 		join_ips=$LOAD_BALANCER_IP
 	fi
 
-	weka local setup container --name dataserv --base-port 14000 --join-ips $join_ips  --only-dataserv-cores --memory 3.5GB --allow-mix-setting
+	setup_container dataserv --base-port 14000 --join-ips $join_ips --only-dataserv-cores --memory 3.5GB --allow-mix-setting
 	echo "$(date -u): success to run weka data services container"
 
 	protect "{\"vm\": \"$VM\", \"protocol\": \"data\"}"
@@ -82,6 +85,7 @@ func (d *DeployScriptGenerator) GetDataServiceDeployScript() string {
 		fetchFunc,
 		statusFunc,
 		reportFunc,
+		bash_functions.SetupContainerFunction(false),
 		d.DeviceNameCmd,
 		bash_functions.GetWekaPartitionScript(),
 		wekaInstallScript,

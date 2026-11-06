@@ -238,6 +238,99 @@ func GetAllInterfaces() string {
 	return dedent.Dedent(s)
 }
 
+// SetupContainerByTypeFunction emits the setup_container_by_type helper, which
+// derives a container's name, base port, dedicated-cores flag and core-ids from
+// its type, then delegates to setup_container. Callers override the per-type
+// base port with $container_base_port: a frontend is 16000 on a backend server
+// but 14000 on a protocol gateway. Host-level flags that are the same for every
+// container come from $container_common_args (failure domain, join IPs,
+// management IP).
+// Requires setup_container, the $container_common_args array, $net, and the
+// <type>_core_ids variables set by get_core_ids.
+func SetupContainerByTypeFunction() string {
+	s := `
+	function setup_container_by_type() {
+		local type=$1
+		local cores=$2
+		shift 2
+
+		local name core_ids type_args default_port
+		case "$type" in
+			drive)
+				name=drives0; default_port=14000; core_ids=$drive_core_ids
+				type_args="--no-frontends --drives-dedicated-cores $cores"
+				;;
+			compute)
+				name=compute0; default_port=15000; core_ids=$compute_core_ids
+				type_args="--no-frontends --compute-dedicated-cores $cores"
+				;;
+			frontend)
+				name=frontend0; default_port=16000; core_ids=$frontend_core_ids
+				type_args="--frontend-dedicated-cores $cores --allow-protocols true"
+				;;
+			*)
+				# only reachable if the generator emits a type that is not handled here
+				echo "$(date -u): unknown container type: $type" >&2
+				exit 1
+				;;
+		esac
+
+		# $container_base_port overrides the per-type default, and stays in
+		# effect for every later call until it is changed or unset
+		local port=${container_base_port:-$default_port}
+
+		# $net is per-container: set_container_net must run before each call
+		setup_container "$name" --base-port "$port" --cores "$cores" $type_args \
+			--core-ids "$core_ids" "${container_common_args[@]}" --dedicate $net "$@"
+	}
+	`
+
+	return dedent.Dedent(s)
+}
+
+// SetContainerNetFunction emits the set_container_net helper, which sets $net
+// for the next container: the DPDK interface string built from the given core
+// range, or UDP when DPDK is off. The range is per-container, so this must be
+// called again before each setup_container_by_type. Requires getNetStrForDpdk.
+func SetContainerNetFunction() string {
+	s := `
+	function set_container_net() {
+		if [[ $INSTALL_DPDK == true ]]; then
+			getNetStrForDpdk $1 $2
+		else
+			net="--net udp"
+		fi
+	}
+	`
+
+	return dedent.Dedent(s)
+}
+
+// SetupContainerFunction emits the setup_container helper, which runs
+// `weka local setup container --name <name>` and, on failure, reports an error
+// and exits. Requires the report function to be defined in the same script.
+// withProtocol adds the "protocol" field to the payload, for the scripts that
+// define $PROTOCOL.
+func SetupContainerFunction(withProtocol bool) string {
+	protocolField := ""
+	if withProtocol {
+		protocolField = `\"protocol\": \"$PROTOCOL\", `
+	}
+
+	s := fmt.Sprintf(`
+	function setup_container() {
+		local name=$1
+		shift
+		if ! weka local setup container --name "$name" "$@"; then
+			report "{\"hostname\": \"$HOSTNAME\", %s\"type\": \"error\", \"message\": \"Failed to setup weka $name container\"}"
+			exit 1
+		fi
+	}
+	`, protocolField)
+
+	return dedent.Dedent(s)
+}
+
 func PrefixToNetmask() string {
 	s := `
 	function prefix_to_netmask() {
